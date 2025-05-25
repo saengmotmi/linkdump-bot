@@ -2,6 +2,8 @@
  * 핵심 도메인 인터페이스들
  */
 
+import { LinkStatus } from "../../link-management/domain/link.js";
+
 export interface LinkData {
   id: string;
   url: string;
@@ -11,7 +13,7 @@ export interface LinkData {
   tags?: string[];
   createdAt: Date;
   processedAt?: Date;
-  status: "pending" | "processed" | "failed";
+  status: LinkStatus;
 }
 
 /**
