@@ -2,6 +2,10 @@ import { Link, LinkProcessingData } from "./link.js";
 import { LinkStatus } from "../../shared/interfaces/index.js";
 import { LinkRepository } from "./link-repository.js";
 import { ContentScraper, AISummarizer } from "../../shared/interfaces/index.js";
+import {
+  ContentTypeDetector,
+  ContentTypeResult,
+} from "./content-type-detector.js";
 
 /**
  * 링크 처리 결과 인터페이스
@@ -10,6 +14,7 @@ export interface LinkProcessingResult {
   success: boolean;
   link: Link;
   error?: string;
+  contentType?: ContentTypeResult;
 }
 
 /**
@@ -17,11 +22,15 @@ export interface LinkProcessingResult {
  * 복잡한 비즈니스 로직과 엔티티 간의 상호작용을 처리합니다.
  */
 export class LinkDomainService {
+  private contentTypeDetector: ContentTypeDetector;
+
   constructor(
     public linkRepository: LinkRepository,
     private contentScraper: ContentScraper,
     private aiSummarizer: AISummarizer
-  ) {}
+  ) {
+    this.contentTypeDetector = new ContentTypeDetector();
+  }
 
   /**
    * 새 링크 생성
@@ -33,7 +42,7 @@ export class LinkDomainService {
   }
 
   /**
-   * 링크 처리 (스크래핑 + AI 요약)
+   * 링크 처리 (스크래핑 + 조건부 AI 요약)
    */
   async processLink(linkId: string): Promise<Link> {
     const link = await this.linkRepository.findById(linkId);
@@ -53,12 +62,32 @@ export class LinkDomainService {
       // 콘텐츠 스크래핑
       const scrapedData = await this.contentScraper.scrape(link.url);
 
-      // AI 요약 생성
-      const summary = await this.aiSummarizer.summarize({
-        url: link.url,
-        title: scrapedData.title,
-        description: scrapedData.description,
-      });
+      // 콘텐츠 타입 감지
+      const contentTypeResult = this.contentTypeDetector.detect(
+        link.url,
+        scrapedData.title || undefined,
+        scrapedData.description || undefined
+      );
+
+      let summary: string;
+
+      if (contentTypeResult.shouldSummarize) {
+        // AI 요약 생성 (LinkedIn, 아티클, 문서 등)
+        console.log(`AI 요약 생성: ${contentTypeResult.reason}`);
+        summary = await this.aiSummarizer.summarize({
+          url: link.url,
+          title: scrapedData.title,
+          description: scrapedData.description,
+        });
+      } else {
+        // OG 태그 기반 간단한 요약 (Twitter, 일반 사이트 등)
+        console.log(`OG 태그 사용: ${contentTypeResult.reason}`);
+        summary = this.createSimpleSummary(
+          scrapedData.title,
+          scrapedData.description,
+          contentTypeResult.type
+        );
+      }
 
       // 처리 완료
       const completedLink = processingLink.completeProcessing({
@@ -78,6 +107,48 @@ export class LinkDomainService {
   }
 
   /**
+   * OG 태그 기반 간단한 요약 생성
+   */
+  private createSimpleSummary(
+    title?: string,
+    description?: string,
+    contentType?: string
+  ): string {
+    const cleanTitle = title || "제목 없음";
+    const cleanDescription = description || "설명이 없습니다.";
+
+    // 콘텐츠 타입별 이모지 추가
+    const getTypeEmoji = (type?: string): string => {
+      switch (type) {
+        case "social_media":
+          return "📱";
+        case "video":
+          return "🎥";
+        case "short_content":
+          return "🔗";
+        case "long_content":
+          return "📄";
+        default:
+          return "🔗";
+      }
+    };
+
+    const emoji = getTypeEmoji(contentType);
+
+    // 소셜미디어의 경우 더 간단하게
+    if (contentType === "social_media") {
+      return `${emoji} ${cleanDescription}`;
+    }
+
+    // 기타 경우 제목 + 설명
+    if (cleanTitle === cleanDescription) {
+      return `${emoji} ${cleanTitle}`;
+    }
+
+    return `${emoji} ${cleanTitle}\n\n${cleanDescription}`;
+  }
+
+  /**
    * 모든 대기 중인 링크 처리
    */
   async processAllPendingLinks(): Promise<LinkProcessingResult[]> {
@@ -87,9 +158,18 @@ export class LinkDomainService {
     for (const link of pendingLinks) {
       try {
         const processedLink = await this.processLink(link.id);
+
+        // 콘텐츠 타입 정보도 함께 반환
+        const contentTypeResult = this.contentTypeDetector.detect(
+          link.url,
+          processedLink.title || undefined,
+          processedLink.description || undefined
+        );
+
         results.push({
           success: true,
           link: processedLink,
+          contentType: contentTypeResult,
         });
       } catch (error) {
         console.error(`링크 처리 실패 (${link.id}):`, error);
