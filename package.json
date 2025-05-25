@@ -11,7 +11,14 @@
     "test": "tsx test/*.ts",
     "check:types": "tsc --noEmit",
     "build": "tsc",
-    "lint": "eslint . --ext .ts,.js"
+    "lint": "eslint . --ext .ts,.js",
+    "deploy": "chmod +x scripts/deploy.sh && ./scripts/deploy.sh",
+    "deploy:test": "chmod +x scripts/post-deploy-test.sh && ./scripts/post-deploy-test.sh",
+    "deploy:quick": "cd workers && wrangler deploy",
+    "health": "chmod +x scripts/health-check.sh && ./scripts/health-check.sh",
+    "rollback": "chmod +x scripts/rollback.sh && ./scripts/rollback.sh",
+    "rollback:previous": "chmod +x scripts/rollback.sh && ./scripts/rollback.sh --previous",
+    "deployments": "cd workers && wrangler deployments list"
   },
   "packageManager": "yarn@4.0.0",
   "devDependencies": {
