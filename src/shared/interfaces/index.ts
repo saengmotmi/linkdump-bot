@@ -89,12 +89,6 @@ export interface Notifier {
  */
 export interface BackgroundTaskRunner {
   schedule(task: () => Promise<void>): Promise<void>;
-  scheduleDelayed(task: () => Promise<void>, delayMs: number): void;
-  scheduleRepeating(
-    task: () => Promise<void>,
-    intervalMs: number,
-    maxRuns?: number
-  ): void;
 }
 
 /**
@@ -117,6 +111,11 @@ export interface QueueProcessor {
   isProcessing(): boolean;
   waitForCompletion(): Promise<void>;
   getPendingTaskCount(): number;
+  /**
+   * 새 태스크가 추가되었을 때 처리를 트리거합니다.
+   * 이미 처리 중이면 무시됩니다.
+   */
+  triggerProcessing(): Promise<void>;
 }
 
 /**
