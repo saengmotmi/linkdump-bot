@@ -227,24 +227,7 @@ export class Link {
       tags: [...this.tags],
       createdAt: this.createdAt,
       processedAt: this.processedAt || undefined,
-      status: this.mapStatusToLinkDataStatus(),
+      status: this.status,
     };
-  }
-
-  /**
-   * Link 엔티티의 status를 LinkData의 status로 매핑
-   */
-  private mapStatusToLinkDataStatus(): "pending" | "processed" | "failed" {
-    switch (this.status) {
-      case "completed":
-        return "processed";
-      case "pending":
-      case "processing":
-        return "pending";
-      case "failed":
-        return "failed";
-      default:
-        return "pending";
-    }
   }
 }
