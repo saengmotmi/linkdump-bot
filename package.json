@@ -5,17 +5,25 @@
   "main": "workers/complete-app.js",
   "scripts": {
     "deploy": "cd workers && wrangler deploy",
-    "test": "vitest",
+    "test": "vitest --run",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage"
   },
-  "dependencies": {},
+  "packageManager": "yarn@4.0.0",
   "devDependencies": {
-    "vitest": "^1.0.0",
     "@cloudflare/workers-types": "^4.20231218.0",
-    "@vitest/coverage-v8": "^1.0.0"
+    "@vitest/coverage-v8": "^1.0.0",
+    "vitest": "^1.0.0"
   },
-  "keywords": ["discord", "bot", "automation", "links", "cloudflare", "workers-ai", "무료"],
+  "keywords": [
+    "discord",
+    "bot",
+    "automation",
+    "links",
+    "cloudflare",
+    "workers-ai",
+    "무료"
+  ],
   "author": "",
   "license": "MIT"
 }

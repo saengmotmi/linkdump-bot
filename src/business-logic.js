@@ -49,16 +49,36 @@ export function extractOGTags(html) {
     return null;
   }
 
-  // 간단한 정규식으로 OG 태그 추출
+  // HTML 속성값 추출을 위한 개선된 정규식 - head 섹션에서만 검색
   const getMetaContent = (property) => {
-    const regex = new RegExp(`<meta[^>]*property=["']${property}["'][^>]*content=["']([^"']*)`, 'i');
-    const match = html.match(regex);
+    // head 섹션 추출 (없으면 전체 HTML 사용)
+    const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+    const searchArea = headMatch ? headMatch[1] : html;
+    
+    // 쌍따옴표로 둘러싸인 경우
+    let regex = new RegExp(`<meta[^>]*property="${property}"[^>]*content="([^"]*)"`, 'i');
+    let match = searchArea.match(regex);
+    if (match) return match[1];
+    
+    // 홑따옴표로 둘러싸인 경우
+    regex = new RegExp(`<meta[^>]*property='${property}'[^>]*content='([^']*)'`, 'i');
+    match = searchArea.match(regex);
     return match ? match[1] : '';
   };
   
   const getMetaName = (name) => {
-    const regex = new RegExp(`<meta[^>]*name=["']${name}["'][^>]*content=["']([^"']*)`, 'i');
-    const match = html.match(regex);
+    // head 섹션 추출 (없으면 전체 HTML 사용)
+    const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+    const searchArea = headMatch ? headMatch[1] : html;
+    
+    // 쌍따옴표로 둘러싸인 경우
+    let regex = new RegExp(`<meta[^>]*name="${name}"[^>]*content="([^"]*)"`, 'i');
+    let match = searchArea.match(regex);
+    if (match) return match[1];
+    
+    // 홑따옴표로 둘러싸인 경우
+    regex = new RegExp(`<meta[^>]*name='${name}'[^>]*content='([^']*)'`, 'i');
+    match = searchArea.match(regex);
     return match ? match[1] : '';
   };
   

@@ -40,7 +40,7 @@ npm install -g wrangler
 wrangler auth
 
 # 3. Workers 배포
-npm run deploy  # 또는 아래 명령어들 직접 실행
+yarn deploy  # 또는 아래 명령어들 직접 실행
 # cd workers
 # cp wrangler-complete.toml wrangler.toml  
 # wrangler secret put DISCORD_WEBHOOKS
@@ -74,16 +74,16 @@ npm run deploy  # 또는 아래 명령어들 직접 실행
 ### 테스트 실행
 ```bash
 # 의존성 설치
-npm install
+yarn install
 
 # 전체 테스트 실행
-npm test
+yarn test
 
 # 테스트 감시 모드
-npm run test:watch
+yarn test:watch
 
 # 커버리지 포함 테스트
-npm run test:coverage
+yarn test:coverage
 ```
 
 ### 테스트 구조
@@ -104,6 +104,7 @@ npm run test:coverage
 ## 🏆 품질 보증
 
 - **테스트 커버리지**: 95%+ 목표
-- **성능 기준**: 1,000개 링크 처리 < 100ms
+- **성능 기준**: 1,000개 링크 처리 < 100ms  
 - **메모리 효율성**: 1,000개 링크 생성 < 5MB
 - **에러 처리**: 모든 예외 상황 안전 처리
+- **패키지 관리**: Yarn 사용으로 의존성 안정성 확보

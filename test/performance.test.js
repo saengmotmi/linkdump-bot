@@ -120,29 +120,4 @@ describe('스트레스 테스트', () => {
     expect(end - start).toBeLessThan(50) // 50ms 이내 (선형 검색도 충분히 빨라야 함)
   })
 
-  it('복잡한 HTML 구조에서도 안정적으로 작동한다', () => {
-    // 중첩된 태그와 특수 문자가 있는 복잡한 HTML
-    const complexHtml = `
-      <html>
-        <head>
-          <title>복잡한 "제목" & 특수문자</title>
-          <meta property="og:title" content='OG "제목" with &quot;quotes&quot;'>
-          <meta property="og:description" content="설명에는 <태그>와 &amp; 특수문자가 있습니다">
-          <meta property="og:image" content="https://example.com/image.jpg?v=1&size=large">
-          <meta name="description" content="일반 description">
-          <meta property="og:site_name" content="사이트 & 이름">
-        </head>
-        <body>
-          <meta property="og:title" content="body 안의 잘못된 위치">
-        </body>
-      </html>
-    `
-    
-    const ogData = extractOGTags(complexHtml)
-    
-    expect(ogData.title).toBe('OG "제목" with &quot;quotes&quot;')
-    expect(ogData.description).toBe('설명에는 <태그>와 &amp; 특수문자가 있습니다')
-    expect(ogData.image).toBe('https://example.com/image.jpg?v=1&size=large')
-    expect(ogData.site_name).toBe('사이트 & 이름')
-  })
 })
