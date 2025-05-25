@@ -89,6 +89,34 @@ export interface Notifier {
  */
 export interface BackgroundTaskRunner {
   schedule(task: () => Promise<void>): Promise<void>;
+  scheduleDelayed(task: () => Promise<void>, delayMs: number): void;
+  scheduleRepeating(
+    task: () => Promise<void>,
+    intervalMs: number,
+    maxRuns?: number
+  ): void;
+}
+
+/**
+ * 태스크 큐 인터페이스
+ */
+export interface TaskQueue {
+  enqueue(task: () => Promise<void>): void;
+  dequeue(): (() => Promise<void>) | undefined;
+  size(): number;
+  isEmpty(): boolean;
+  clear(): void;
+}
+
+/**
+ * 큐 프로세서 인터페이스
+ */
+export interface QueueProcessor {
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  isProcessing(): boolean;
+  waitForCompletion(): Promise<void>;
+  getPendingTaskCount(): number;
 }
 
 /**
@@ -115,6 +143,10 @@ export const TOKENS = {
   ContentScraper: Symbol.for("ContentScraper"),
   Notifier: Symbol.for("Notifier"),
   BackgroundTaskRunner: Symbol.for("BackgroundTaskRunner"),
+
+  // 큐 관련 서비스들
+  TaskQueue: Symbol.for("TaskQueue"),
+  QueueProcessor: Symbol.for("QueueProcessor"),
 
   // 도메인 서비스들 (실제 인터페이스는 도메인 레이어에서 정의)
   LinkRepository: Symbol.for("LinkRepository"),
