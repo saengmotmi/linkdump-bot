@@ -1,5 +1,0 @@
-# GitHub Actions는 더 이상 사용하지 않습니다.
-# 모든 링크 처리가 Cloudflare Workers에서 실시간으로 처리됩니다.
-# 
-# 이 파일은 참고용으로만 남겨두었습니다.
-# 실제 배포에서는 workers/complete-app.js를 사용하세요.
