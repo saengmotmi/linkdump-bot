@@ -15,14 +15,14 @@ export interface LinkData {
 }
 
 /**
- * 스토리지 인터페이스
+ * 저장소 인터페이스
  */
 export interface Storage {
-  save(key: string, data: any): Promise<void>;
-  load(key: string): Promise<any>;
-  exists(key: string): Promise<boolean>;
+  save<T = unknown>(key: string, data: T): Promise<void>;
+  load<T = unknown>(key: string): Promise<T>;
+  get<T = unknown>(key: string): Promise<T | null>;
   delete(key: string): Promise<void>;
-  list(prefix?: string): Promise<string[]>;
+  list(): Promise<string[]>;
 }
 
 /**
@@ -93,8 +93,8 @@ export interface LinkRepository {
 export interface Config {
   webhookUrls?: string[];
   dataPath?: string;
-  env?: any;
-  ctx?: any;
+  env?: ExecutionContext;
+  ctx?: ExecutionContext;
 }
 
 /**

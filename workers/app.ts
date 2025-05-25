@@ -4,8 +4,21 @@ import { createCloudflareContainer } from "../src/shared/container/cloudflare-co
 import { LinkManagementService } from "../src/link-management/application/link-management-service.js";
 import { TOKENS, type Config } from "../src/shared/interfaces/index.js";
 
+// Cloudflare Workers 환경 타입 정의
+interface Env {
+  LINKDUMP_STORAGE: R2Bucket;
+  AI: Ai;
+  DISCORD_WEBHOOKS?: string;
+  OPENAI_API_KEY?: string;
+  CF_PAGES?: string;
+}
+
 export default {
-  async fetch(request: Request, env: any, ctx: any): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<Response> {
     try {
       // TSyringe 컨테이너 설정
       await createCloudflareContainer(env, ctx);

@@ -26,7 +26,7 @@ function createLocalServiceConfig(
       token: TOKENS.Storage,
       import: "../../link-management/infrastructure/storage/file-storage.js",
       class: "FileStorage",
-      factory: (deps: any) => {
+      factory: (deps: ServiceDependencies) => {
         const config = deps.resolve(TOKENS.Config);
         return new deps.FileStorage(config.dataPath || "./data");
       },
@@ -35,7 +35,7 @@ function createLocalServiceConfig(
       token: TOKENS.LinkRepository,
       import: "../../link-management/infrastructure/storage-link-repository.js",
       class: "StorageLinkRepository",
-      factory: (deps: any) =>
+      factory: (deps: ServiceDependencies) =>
         new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage)),
     },
     {
@@ -43,10 +43,10 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/ai-provider/workers-ai-client.js",
       class: "WorkersAIClient",
-      factory: (deps: any) => {
+      factory: (deps: ServiceDependencies) => {
         // 로컬 환경에서는 mock AI binding 사용
         const mockAI = {
-          run: async (model: string, options: any) => {
+          run: async (model: string, options: Record<string, unknown>) => {
             return { response: "Mock AI response for local development" };
           },
         };
@@ -58,7 +58,7 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js",
       class: "WorkersAISummarizer",
-      factory: (deps: any) =>
+      factory: (deps: ServiceDependencies) =>
         new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient)),
     },
     {
@@ -66,14 +66,14 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/content-scraper/web-scraper.js",
       class: "WebContentScraper",
-      factory: (deps: any) => new deps.WebContentScraper(),
+      factory: (deps: ServiceDependencies) => new deps.WebContentScraper(),
     },
     {
       token: TOKENS.Notifier,
       import:
         "../../link-management/infrastructure/notification/discord-notifier.js",
       class: "DiscordNotifier",
-      factory: (deps: any) => {
+      factory: (deps: ServiceDependencies) => {
         const config = deps.resolve(TOKENS.Config);
         return new deps.DiscordNotifier(config.webhookUrls || []);
       },
@@ -83,7 +83,7 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/background-task/local-background-runner.js",
       class: "LocalBackgroundRunner",
-      factory: (deps: any) => new deps.LocalBackgroundRunner(),
+      factory: (deps: ServiceDependencies) => new deps.LocalBackgroundRunner(),
     },
   ];
 }
@@ -114,4 +114,10 @@ export async function createLocalContainer(config: Partial<Config> = {}) {
   await setupLocalContainer(config);
 
   return childContainer;
+}
+
+// 서비스 의존성 타입 정의
+interface ServiceDependencies {
+  resolve: (token: symbol) => unknown;
+  [key: string]: unknown;
 }

@@ -100,3 +100,11 @@ export async function createCloudflareContainer(env: any, ctx?: any) {
 
   return childContainer;
 }
+
+// Cloudflare Workers 환경 타입 정의
+interface CloudflareEnv {
+  LINKDUMP_STORAGE: R2Bucket;
+  AI: Ai;
+  DISCORD_WEBHOOKS?: string;
+  OPENAI_API_KEY?: string;
+}

@@ -52,6 +52,22 @@ export class FileStorage implements Storage {
   }
 
   /**
+   * 데이터 조회 (null 반환)
+   */
+  async get<T = unknown>(key: string): Promise<T | null> {
+    try {
+      const filePath = this._getFilePath(key);
+      const content = await fs.readFile(filePath, "utf8");
+      return JSON.parse(content);
+    } catch (error: any) {
+      if (error.code === "ENOENT") {
+        return null;
+      }
+      throw new Error(`파일 조회 실패: ${error.message}`);
+    }
+  }
+
+  /**
    * 데이터 삭제
    */
   async delete(key: string): Promise<void> {
