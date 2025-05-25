@@ -4,6 +4,7 @@
   "description": "완전 무료 Cloudflare Workers AI 기반 링크 공유 봇",
   "main": "workers/complete-app.js",
   "scripts": {
+    "dev": "cd workers && wrangler dev",
     "deploy": "cd workers && wrangler deploy",
     "test": "vitest --run",
     "test:watch": "vitest --watch",
