@@ -60,33 +60,9 @@ export class LinkDomainService {
         description: scrapedData.description,
       });
 
-      // AI 타이틀 생성 (AISummarizer에 generateTitle 메서드가 있는 경우)
-      let finalTitle = scrapedData.title || "";
-      if (
-        "generateTitle" in this.aiSummarizer &&
-        typeof this.aiSummarizer.generateTitle === "function"
-      ) {
-        try {
-          finalTitle = await (this.aiSummarizer as any).generateTitle({
-            url: link.url,
-            title: scrapedData.title,
-            description: scrapedData.description,
-            content: scrapedData.content,
-          });
-        } catch (error) {
-          console.warn("AI 타이틀 생성 실패, 기본 타이틀 사용:", error);
-          finalTitle = this.generateMeaningfulTitle(
-            scrapedData.title,
-            link.url
-          );
-        }
-      } else {
-        finalTitle = this.generateMeaningfulTitle(scrapedData.title, link.url);
-      }
-
       // 처리 완료
       const completedLink = processingLink.completeProcessing({
-        title: finalTitle,
+        title: scrapedData.title || "No Title",
         description: scrapedData.description || "설명이 없습니다.",
         image: undefined,
         summary,
@@ -180,30 +156,5 @@ export class LinkDomainService {
       byStatus,
       byTags,
     };
-  }
-
-  private generateMeaningfulTitle(
-    title: string | undefined,
-    url: string
-  ): string {
-    if (title && title.trim()) {
-      return title.trim();
-    }
-
-    // URL에서 도메인명 추출
-    try {
-      const urlObj = new URL(url);
-      const hostname = urlObj.hostname;
-
-      // X(트위터) 특별 처리
-      if (hostname.includes("x.com") || hostname.includes("twitter.com")) {
-        return "트윗";
-      }
-
-      // 일반적인 도메인명 사용
-      return hostname.replace("www.", "");
-    } catch {
-      return "링크";
-    }
   }
 }
