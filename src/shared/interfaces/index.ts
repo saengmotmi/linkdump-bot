@@ -76,14 +76,6 @@ export interface BackgroundTaskRunner {
 }
 
 /**
- * 런타임 인터페이스
- */
-export interface Runtime {
-  setCorsHeaders(response: Response): Response;
-  getEnvironment(): any;
-}
-
-/**
  * 링크 저장소 인터페이스
  */
 export interface LinkRepository {
@@ -96,35 +88,30 @@ export interface LinkRepository {
 }
 
 /**
- * 설정 인터페이스
+ * 설정 인터페이스 - 실제 설정값만 포함
  */
 export interface Config {
-  openaiApiKey?: string;
-  discordWebhooks?: string[];
+  webhookUrls?: string[];
   dataPath?: string;
-  aiProvider?: "openai" | "workers-ai" | "claude";
-  storageProvider?: "file" | "r2" | "redis";
   env?: any;
   ctx?: any;
 }
 
 /**
- * DI 토큰들
+ * DI 토큰들 - 실제 사용되는 것들만
  */
 export const TOKENS = {
   // 설정
   Config: Symbol.for("Config"),
 
-  // 인프라
+  // 인프라스트럭처 서비스들
   Storage: Symbol.for("Storage"),
   AIClient: Symbol.for("AIClient"),
   AISummarizer: Symbol.for("AISummarizer"),
   ContentScraper: Symbol.for("ContentScraper"),
   Notifier: Symbol.for("Notifier"),
   BackgroundTaskRunner: Symbol.for("BackgroundTaskRunner"),
-  Runtime: Symbol.for("Runtime"),
 
-  // 도메인
+  // 도메인 서비스들
   LinkRepository: Symbol.for("LinkRepository"),
-  LinkManagementService: Symbol.for("LinkManagementService"),
 } as const;

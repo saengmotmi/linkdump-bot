@@ -33,9 +33,9 @@ export interface OGData {
 }
 
 /**
- * Discord 임베드 인터페이스
+ * 알림 임베드 인터페이스 (구현체 무관)
  */
-export interface DiscordEmbed {
+export interface NotificationEmbed {
   title: string;
   description: string;
   url: string;
@@ -47,10 +47,10 @@ export interface DiscordEmbed {
 }
 
 /**
- * Discord 메시지 인터페이스
+ * 알림 메시지 인터페이스 (구현체 무관)
  */
-export interface DiscordMessage {
-  embeds: DiscordEmbed[];
+export interface NotificationMessage {
+  embeds: NotificationEmbed[];
 }
 
 /**
@@ -184,23 +184,32 @@ Write a compelling summary in Korean that motivates clicking:`;
 }
 
 /**
- * Workers AI 응답 파싱
+ * AI 응답 파싱 (구현체 무관)
  */
-export function parseWorkersAIResponse(response: any, ogData: OGData): string {
+export function parseAIResponse(response: any, ogData: OGData): string {
   if (!response) {
     return `🔗 ${ogData.title}\n📝 ${ogData.description}\n🎯 자세한 내용을 확인해보세요!`;
   }
 
+  // 다양한 AI 제공자의 응답 형식 지원
   const summary =
-    response.response || response.result || "AI 요약을 생성할 수 없습니다.";
+    response.response || // Workers AI
+    response.result || // Workers AI 대체 필드
+    response.content || // OpenAI/Claude
+    response.text || // 기타 제공자
+    response.message || // 기타 제공자
+    "AI 요약을 생성할 수 없습니다.";
+
   return summary.trim();
 }
 
 /**
- * Discord 임베드 메시지 생성
+ * 알림 임베드 메시지 생성 (구현체 무관)
  */
-export function createDiscordEmbed(linkData: LinkData): DiscordMessage {
-  const embed: DiscordEmbed = {
+export function createNotificationEmbed(
+  linkData: LinkData
+): NotificationMessage {
+  const embed: NotificationEmbed = {
     title: linkData.ogData?.title || "New Link",
     description: linkData.summary || "",
     url: linkData.url,

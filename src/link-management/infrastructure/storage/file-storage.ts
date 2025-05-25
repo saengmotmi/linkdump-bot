@@ -1,21 +1,19 @@
-import { promises as fs } from "fs";
-import path from "path";
-import { injectable, inject } from "tsyringe";
+import * as fs from "fs/promises";
+import * as path from "path";
 import type { Storage } from "../../../shared/interfaces/index.js";
 
 /**
- * 파일 시스템 스토리지 구현체
+ * 파일 시스템 기반 스토리지 구현체
  */
-@injectable()
 export class FileStorage implements Storage {
   private basePath: string;
 
-  constructor(@inject("DATA_PATH") basePath: string = "./data") {
-    this.basePath = basePath;
-    this._ensureDirectory();
+  constructor(private dataPath: string) {
+    this.basePath = this.dataPath;
+    this.ensureDataDirectory();
   }
 
-  private async _ensureDirectory(): Promise<void> {
+  private async ensureDataDirectory(): Promise<void> {
     try {
       await fs.mkdir(this.basePath, { recursive: true });
     } catch (error) {
@@ -31,7 +29,7 @@ export class FileStorage implements Storage {
    * 데이터 저장
    */
   async save(key: string, data: any): Promise<void> {
-    await this._ensureDirectory();
+    await this.ensureDataDirectory();
     const filePath = this._getFilePath(key);
     const serialized = JSON.stringify(data, null, 2);
     await fs.writeFile(filePath, serialized, "utf8");
@@ -72,7 +70,7 @@ export class FileStorage implements Storage {
    */
   async list(prefix: string = ""): Promise<string[]> {
     try {
-      await this._ensureDirectory();
+      await this.ensureDataDirectory();
       const files = await fs.readdir(this.basePath);
       return files.filter((file) => file.startsWith(prefix));
     } catch (error) {

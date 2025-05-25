@@ -1,4 +1,3 @@
-import { injectable, inject } from "tsyringe";
 import type { Storage } from "../../../shared/interfaces/index.js";
 
 interface R2Object {
@@ -32,11 +31,10 @@ interface R2Bucket {
 /**
  * Cloudflare R2 스토리지 구현체
  */
-@injectable()
 export class R2Storage implements Storage {
   private bucket: R2Bucket;
 
-  constructor(@inject("R2_BUCKET") r2Bucket: R2Bucket) {
+  constructor(r2Bucket: R2Bucket) {
     this.bucket = r2Bucket;
   }
 

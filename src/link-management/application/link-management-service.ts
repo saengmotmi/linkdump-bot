@@ -20,10 +20,10 @@ export class LinkManagementService {
   private linkDomainService: LinkDomainService;
 
   constructor(
-    @inject(TOKENS.LinkRepository) linkRepository: LinkRepository,
-    @inject(TOKENS.ContentScraper) contentScraper: ContentScraper,
-    @inject(TOKENS.AISummarizer) aiSummarizer: AISummarizer,
-    @inject(TOKENS.Notifier) private discordNotifier: Notifier,
+    @inject(TOKENS.LinkRepository) private linkRepository: LinkRepository,
+    @inject(TOKENS.ContentScraper) private contentScraper: ContentScraper,
+    @inject(TOKENS.AISummarizer) private aiSummarizer: AISummarizer,
+    @inject(TOKENS.Notifier) private notifier: Notifier,
     @inject(TOKENS.BackgroundTaskRunner)
     private backgroundTaskRunner: BackgroundTaskRunner
   ) {
@@ -35,7 +35,7 @@ export class LinkManagementService {
   }
 
   /**
-   * 새 링크 추가 (사용자 요청)
+   * 링크 추가 및 백그라운드 처리
    */
   async addLink(url: string, tags: string[] = []) {
     try {
@@ -49,9 +49,9 @@ export class LinkManagementService {
             newLink.id
           );
 
-          // Discord로 전송
+          // 알림으로 전송
           if (processedLink.isCompleted()) {
-            await this.discordNotifier.send({
+            await this.notifier.send({
               id: processedLink.id,
               url: processedLink.url,
               title: processedLink.title || undefined,
@@ -94,7 +94,7 @@ export class LinkManagementService {
     try {
       const results = await this.linkDomainService.processAllPendingLinks();
 
-      // 성공적으로 처리된 링크들을 Discord로 전송
+      // 성공적으로 처리된 링크들을 알림으로 전송
       const successfulLinks = results
         .filter((result: any) => result.success)
         .map((result: any) => result.link);
@@ -117,9 +117,9 @@ export class LinkManagementService {
                   ? ("processed" as const)
                   : (link.status as "pending" | "processed" | "failed"),
             };
-            await this.discordNotifier.send(linkData);
+            await this.notifier.send(linkData);
           } catch (error) {
-            console.error(`Discord 전송 실패 (${link.id}):`, error);
+            console.error(`알림 전송 실패 (${link.id}):`, error);
           }
         }
       }
@@ -237,7 +237,7 @@ export class LinkManagementService {
 
       // Discord로 전송
       if (processedLink.isCompleted()) {
-        await this.discordNotifier.send({
+        await this.notifier.send({
           id: processedLink.id,
           url: processedLink.url,
           title: processedLink.title || undefined,

@@ -1,4 +1,3 @@
-import { injectable, inject } from "tsyringe";
 import type {
   AISummarizer,
   AIClient,
@@ -8,11 +7,10 @@ import { TOKENS } from "../../../shared/interfaces/index.js";
 /**
  * Cloudflare Workers AI 기반 요약 구현체
  */
-@injectable()
 export class WorkersAISummarizer implements AISummarizer {
   private workersAIClient: AIClient;
 
-  constructor(@inject(TOKENS.AIClient) workersAIClient: AIClient) {
+  constructor(workersAIClient: AIClient) {
     this.workersAIClient = workersAIClient;
   }
 

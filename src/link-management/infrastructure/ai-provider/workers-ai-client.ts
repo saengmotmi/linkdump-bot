@@ -1,4 +1,3 @@
-import { injectable, inject } from "tsyringe";
 import type { AIClient, AIOptions } from "../../../shared/interfaces/index.js";
 
 interface WorkersAIMessage {
@@ -14,13 +13,12 @@ interface WorkersAIResponse {
 /**
  * Cloudflare Workers AI 클라이언트
  */
-@injectable()
 export class WorkersAIClient implements AIClient {
   private ai: any; // Cloudflare AI binding
   private defaultModel: string;
 
   constructor(
-    @inject("AI_BINDING") aiBinding: any,
+    aiBinding: any,
     defaultModel: string = "@cf/meta/llama-3.2-1b-instruct"
   ) {
     this.ai = aiBinding;

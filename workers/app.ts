@@ -1,18 +1,17 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
-import { setupCloudflareContainer } from "../src/shared/container/cloudflare-container.js";
+import { createCloudflareContainer } from "../src/shared/container/cloudflare-container.js";
 import { LinkManagementService } from "../src/link-management/application/link-management-service.js";
-import { Runtime, TOKENS } from "../src/shared/interfaces/index.js";
+import { TOKENS, type Config } from "../src/shared/interfaces/index.js";
 
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
     try {
       // TSyringe 컨테이너 설정
-      await setupCloudflareContainer(env, ctx);
+      await createCloudflareContainer(env, ctx);
 
       // 서비스 해결
       const linkManagementService = container.resolve(LinkManagementService);
-      const runtime = container.resolve<Runtime>(TOKENS.Runtime);
 
       const url = new URL(request.url);
       const method = request.method;
@@ -153,22 +152,38 @@ async function handleGetLinks(
 }
 
 /**
- * 설정 조회 핸들러
+ * 설정 조회 핸들러 - 실제 컨테이너 설정을 동적으로 조회
  */
 async function handleGetConfig(env: any): Promise<Response> {
   try {
-    const config = {
-      aiProvider: env.AI_PROVIDER || "workers-ai",
-      storageType: env.STORAGE_TYPE || "r2",
-      hasOpenAI: !!env.OPENAI_API_KEY,
-      hasDiscordWebhooks: !!env.DISCORD_WEBHOOKS,
-      architecture: "TSyringe-based Plugin System",
+    // 실제 컨테이너에서 설정 조회
+    const config = container.resolve<Config>(TOKENS.Config);
+
+    // 등록된 서비스들의 실제 구현체 확인
+    const aiClient = container.resolve(TOKENS.AIClient);
+    const storage = container.resolve(TOKENS.Storage);
+    const notifier = container.resolve(TOKENS.Notifier);
+    const backgroundTaskRunner = container.resolve(TOKENS.BackgroundTaskRunner);
+
+    const responseConfig = {
+      hasWebhooks: !!(config.webhookUrls && config.webhookUrls.length > 0),
+      architecture: "TSyringe-based Dependency Injection",
+      environment: env.CF_PAGES ? "Cloudflare Pages" : "Cloudflare Workers",
+      services: {
+        ai: (aiClient as any).constructor.name,
+        storage: (storage as any).constructor.name,
+        notifications: (notifier as any).constructor.name,
+        backgroundTasks: (backgroundTaskRunner as any).constructor.name,
+      },
     };
 
-    return new Response(JSON.stringify({ success: true, config }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({ success: true, config: responseConfig }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (error: any) {
     return new Response(
       JSON.stringify({ success: false, error: error.message }),

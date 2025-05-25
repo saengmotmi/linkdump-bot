@@ -1,13 +1,11 @@
-import { injectable } from "tsyringe";
 import type { BackgroundTaskRunner } from "../../../shared/interfaces/index.js";
 
 /**
  * 로컬 개발 환경 백그라운드 태스크 러너
  */
-@injectable()
 export class LocalBackgroundRunner implements BackgroundTaskRunner {
   private taskQueue: Array<() => Promise<void>> = [];
-  private isProcessing: boolean = false;
+  private isProcessing = false;
 
   /**
    * 백그라운드 태스크 스케줄링

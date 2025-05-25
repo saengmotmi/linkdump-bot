@@ -1,104 +1,104 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type { Config, Storage } from "../interfaces/index.js";
+import type { Config } from "../interfaces/index.js";
 import { TOKENS } from "../interfaces/index.js";
+import { setupContainer, type ServiceConfig } from "./service-registry.js";
+
+/**
+ * 로컬 개발 환경 서비스 설정 정의
+ */
+function createLocalServiceConfig(
+  configOverrides: Partial<Config> = {}
+): ServiceConfig[] {
+  return [
+    // 설정 객체 - 환경별 설정값만 포함
+    {
+      token: TOKENS.Config,
+      factory: () => ({
+        dataPath: "./data",
+        webhookUrls: process.env.DISCORD_WEBHOOKS
+          ? JSON.parse(process.env.DISCORD_WEBHOOKS)
+          : [],
+        ...configOverrides,
+      }),
+    },
+    {
+      token: TOKENS.Storage,
+      import: "../../link-management/infrastructure/storage/file-storage.js",
+      class: "FileStorage",
+      factory: (deps: any) => {
+        const config = deps.resolve(TOKENS.Config);
+        return new deps.FileStorage(config.dataPath || "./data");
+      },
+    },
+    {
+      token: TOKENS.LinkRepository,
+      import: "../../link-management/infrastructure/storage-link-repository.js",
+      class: "StorageLinkRepository",
+      factory: (deps: any) =>
+        new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage)),
+    },
+    {
+      token: TOKENS.AIClient,
+      import:
+        "../../link-management/infrastructure/ai-provider/workers-ai-client.js",
+      class: "WorkersAIClient",
+      factory: (deps: any) => {
+        // 로컬 환경에서는 mock AI binding 사용
+        const mockAI = {
+          run: async (model: string, options: any) => {
+            return { response: "Mock AI response for local development" };
+          },
+        };
+        return new deps.WorkersAIClient(mockAI);
+      },
+    },
+    {
+      token: TOKENS.AISummarizer,
+      import:
+        "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js",
+      class: "WorkersAISummarizer",
+      factory: (deps: any) =>
+        new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient)),
+    },
+    {
+      token: TOKENS.ContentScraper,
+      import:
+        "../../link-management/infrastructure/content-scraper/web-scraper.js",
+      class: "WebContentScraper",
+      factory: (deps: any) => new deps.WebContentScraper(),
+    },
+    {
+      token: TOKENS.Notifier,
+      import:
+        "../../link-management/infrastructure/notification/discord-notifier.js",
+      class: "DiscordNotifier",
+      factory: (deps: any) => {
+        const config = deps.resolve(TOKENS.Config);
+        return new deps.DiscordNotifier(config.webhookUrls || []);
+      },
+    },
+    {
+      token: TOKENS.BackgroundTaskRunner,
+      import:
+        "../../link-management/infrastructure/background-task/local-background-runner.js",
+      class: "LocalBackgroundRunner",
+      factory: (deps: any) => new deps.LocalBackgroundRunner(),
+    },
+  ];
+}
 
 /**
  * 로컬 개발 환경용 컨테이너 설정
  */
-export async function setupLocalContainer(config: Partial<Config> = {}) {
-  const localConfig: Config = {
-    aiProvider: "openai",
-    storageProvider: "file",
-    dataPath: "./data",
-    openaiApiKey: process.env.OPENAI_API_KEY,
-    discordWebhooks: process.env.DISCORD_WEBHOOKS
-      ? JSON.parse(process.env.DISCORD_WEBHOOKS)
-      : [],
-    ...config,
-  };
+export async function setupLocalContainer(
+  configOverrides: Partial<Config> = {}
+) {
+  // 서비스 설정 생성 (설정 객체 포함)
+  const serviceConfig = createLocalServiceConfig(configOverrides);
 
-  // 설정 등록
-  container.registerInstance(TOKENS.Config, localConfig);
-
-  // 스토리지 등록
-  container.register(TOKENS.Storage, {
-    useFactory: async () => {
-      const { FileStorage } = await import(
-        "../../link-management/infrastructure/storage/file-storage.js"
-      );
-      return new FileStorage("./data");
-    },
-  });
-
-  // AI 클라이언트 등록
-  container.register(TOKENS.AIClient, {
-    useFactory: async () => {
-      const { OpenAIClient } = await import(
-        "../../link-management/infrastructure/ai-provider/openai-client.js"
-      );
-      return new OpenAIClient(localConfig.openaiApiKey!);
-    },
-  });
-
-  // AI 요약기 등록
-  container.register(TOKENS.AISummarizer, {
-    useFactory: async () => {
-      const { OpenAISummarizer } = await import(
-        "../../link-management/infrastructure/ai-summarizer/openai-summarizer.js"
-      );
-      return container.resolve(OpenAISummarizer);
-    },
-  });
-
-  // 런타임 등록 (로컬에서는 기본 런타임 사용)
-  container.registerInstance(TOKENS.Runtime, {
-    getCorsHeaders: () => ({
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    }),
-  });
-
-  // 콘텐츠 스크래퍼 등록
-  container.register(TOKENS.ContentScraper, {
-    useFactory: async () => {
-      const { WebContentScraper } = await import(
-        "../../link-management/infrastructure/content-scraper/web-scraper.js"
-      );
-      return new WebContentScraper();
-    },
-  });
-
-  // 알림기 등록
-  container.register(TOKENS.Notifier, {
-    useFactory: async () => {
-      const { DiscordNotifier } = await import(
-        "../../link-management/infrastructure/notification/discord-notifier.js"
-      );
-      return new DiscordNotifier(localConfig.discordWebhooks || []);
-    },
-  });
-
-  // 백그라운드 태스크 러너 등록
-  container.register(TOKENS.BackgroundTaskRunner, {
-    useFactory: async () => {
-      const { LocalBackgroundRunner } = await import(
-        "../../link-management/infrastructure/background-task/local-background-runner.js"
-      );
-      return new LocalBackgroundRunner();
-    },
-  });
-
-  // 링크 저장소 등록
-  const { StorageLinkRepository } = await import(
-    "../../link-management/infrastructure/storage-link-repository"
-  );
-  const storage = container.resolve<Storage>(TOKENS.Storage);
-  container.registerInstance(
-    TOKENS.LinkRepository,
-    new StorageLinkRepository(storage)
-  );
+  // 공통 컨테이너 설정 로직 사용
+  await setupContainer(serviceConfig);
 
   return container;
 }

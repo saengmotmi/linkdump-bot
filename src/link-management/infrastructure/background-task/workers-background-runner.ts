@@ -1,28 +1,35 @@
-import { injectable, inject } from "tsyringe";
+import { injectable } from "tsyringe";
 import type { BackgroundTaskRunner } from "../../../shared/interfaces/index.js";
+
+interface WorkersContext {
+  waitUntil(promise: Promise<any>): void;
+}
 
 /**
  * Cloudflare Workers 환경 백그라운드 태스크 러너
  */
 @injectable()
 export class WorkersBackgroundRunner implements BackgroundTaskRunner {
-  constructor(@inject("WORKERS_RUNTIME") private workersRuntime: any) {}
+  constructor(private options: { env: any; ctx: WorkersContext }) {}
 
   /**
    * 백그라운드 태스크 스케줄링
    */
   async schedule(task: () => Promise<void>): Promise<void> {
-    this.workersRuntime.scheduleBackgroundTask(task);
+    // Cloudflare Workers의 waitUntil을 사용하여 백그라운드 실행
+    this.options.ctx.waitUntil(task());
   }
 
   /**
    * 지연된 태스크 스케줄링
    */
   scheduleDelayed(task: () => Promise<void>, delayMs: number): void {
-    this.workersRuntime.scheduleBackgroundTask(async () => {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-      await task();
-    });
+    this.options.ctx.waitUntil(
+      (async () => {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await task();
+      })()
+    );
   }
 
   /**

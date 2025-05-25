@@ -1,21 +1,16 @@
 name = "linkdump-bot"
-main = "app.js"
-compatibility_date = "2024-01-15"
+main = "app.ts"
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
-# R2 Bucket 바인딩
+# R2 Bucket binding
 [[r2_buckets]]
 binding = "LINKDUMP_STORAGE"
 bucket_name = "linkdump-data"
 
-# Workers AI 바인딩
+# Workers AI binding
 [ai]
 binding = "AI"
 
-# Secrets (wrangler secret put으로 설정):
+# Secrets (set with `wrangler secret put <name>`):
 # wrangler secret put DISCORD_WEBHOOKS
-# 
-# 추가 가능한 설정들:
-# wrangler secret put OPENAI_API_KEY (OpenAI 사용시)
-# wrangler secret put AI_PROVIDER (workers-ai|openai)
-# wrangler secret put STORAGE_TYPE (r2|filesystem) 
