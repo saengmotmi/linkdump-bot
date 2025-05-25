@@ -1,3 +1,4 @@
+import * as cheerio from "cheerio";
 import type { ContentScraper } from "../../../shared/interfaces/index.js";
 
 interface ScrapingOptions {
@@ -60,9 +61,111 @@ export class WebContentScraper implements ContentScraper {
   }
 
   /**
-   * HTML에서 메타데이터 파싱
+   * HTML에서 메타데이터 파싱 - cheerio 사용
    */
   private parseMetadata(html: string): ScrapedContent {
+    try {
+      const $ = cheerio.load(html);
+
+      // Open Graph 태그 추출
+      const ogTitle = $('meta[property="og:title"]').attr("content");
+      const ogDescription = $('meta[property="og:description"]').attr(
+        "content"
+      );
+      const ogImage = $('meta[property="og:image"]').attr("content");
+      const ogSiteName = $('meta[property="og:site_name"]').attr("content");
+
+      // Twitter Card 태그 추출
+      const twitterTitle = $('meta[name="twitter:title"]').attr("content");
+      const twitterDescription = $('meta[name="twitter:description"]').attr(
+        "content"
+      );
+      const twitterImage = $('meta[name="twitter:image"]').attr("content");
+
+      // 기본 HTML 태그 추출
+      const htmlTitle = $("title").text().trim();
+      const metaDescription = $('meta[name="description"]').attr("content");
+
+      // JSON-LD 구조화 데이터 추출 시도
+      const jsonLdData = this.extractJsonLd($);
+
+      // 우선순위에 따른 값 선택
+      const title = this.selectBestValue([
+        ogTitle,
+        twitterTitle,
+        jsonLdData?.name || jsonLdData?.headline,
+        htmlTitle,
+      ]);
+
+      const description = this.selectBestValue([
+        ogDescription,
+        twitterDescription,
+        jsonLdData?.description,
+        metaDescription,
+      ]);
+
+      const image = this.selectBestValue([
+        ogImage,
+        twitterImage,
+        jsonLdData?.image,
+      ]);
+
+      console.log(
+        `스크래핑 결과 - 제목: ${title}, 설명: ${description?.substring(
+          0,
+          50
+        )}...`
+      );
+
+      return {
+        title: title || undefined,
+        description: description || undefined,
+        image: image || undefined,
+        scrapedAt: new Date(),
+      };
+    } catch (error) {
+      console.warn("Cheerio 파싱 실패, 폴백 방식 사용:", error);
+      return this.parseMetadataFallback(html);
+    }
+  }
+
+  /**
+   * JSON-LD 구조화 데이터 추출
+   */
+  private extractJsonLd($: cheerio.CheerioAPI): any {
+    try {
+      const jsonLdScript = $('script[type="application/ld+json"]')
+        .first()
+        .html();
+      if (jsonLdScript) {
+        const jsonData = JSON.parse(jsonLdScript);
+        // 배열인 경우 첫 번째 요소 사용
+        return Array.isArray(jsonData) ? jsonData[0] : jsonData;
+      }
+    } catch (error) {
+      console.warn("JSON-LD 파싱 실패:", error);
+    }
+    return null;
+  }
+
+  /**
+   * 가장 적절한 값 선택 (빈 문자열이나 null 제외)
+   */
+  private selectBestValue(
+    values: (string | undefined | null)[]
+  ): string | null {
+    for (const value of values) {
+      if (value && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 폴백 메타데이터 파싱 (정규식 사용)
+   */
+  private parseMetadataFallback(html: string): ScrapedContent {
     // Open Graph 태그 우선 추출
     const ogTitle = this.extractMetaContent(html, "og:title");
     const ogDescription = this.extractMetaContent(html, "og:description");
@@ -81,7 +184,7 @@ export class WebContentScraper implements ContentScraper {
   }
 
   /**
-   * 메타 태그 content 추출
+   * 메타 태그 content 추출 (정규식 - 폴백용)
    */
   private extractMetaContent(html: string, property: string): string | null {
     const patterns = [

@@ -37,6 +37,9 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
+    "@types/cheerio": "^1.0.0",
+    "cheerio": "^1.0.0",
+    "node-html-parser": "^7.0.1",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"
   }
