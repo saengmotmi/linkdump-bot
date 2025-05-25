@@ -149,4 +149,11 @@ export const TOKENS = {
 
   // 도메인 서비스들 (실제 인터페이스는 도메인 레이어에서 정의)
   LinkRepository: Symbol.for("LinkRepository"),
+  LinkManagementService: Symbol.for("LinkManagementService"),
+
+  // API 컨트롤러들
+  LinkController: Symbol.for("LinkController"),
+  ConfigController: Symbol.for("ConfigController"),
+  PreviewController: Symbol.for("PreviewController"),
+  ApiRouter: Symbol.for("ApiRouter"),
 } as const;

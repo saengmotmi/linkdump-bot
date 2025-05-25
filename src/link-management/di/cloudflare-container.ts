@@ -11,6 +11,7 @@
  * - Workers AI (AI 서비스)
  * - Discord Notifier (웹훅 알림)
  * - Background Task Runner (백그라운드 작업)
+ * - API Controllers (웹 API 컨트롤러)
  *
  * 사용처: workers/app.ts에서 import하여 사용
  */
@@ -130,6 +131,62 @@ function createCloudflareServiceConfig(
           taskQueue,
           queueProcessor
         );
+      },
+    },
+    // Application Services
+    {
+      token: TOKENS.LinkManagementService,
+      importFn: () => import("../application/link-management-service.js"),
+      class: "LinkManagementService",
+      factory: (deps: ServiceDependencies) => {
+        const linkRepository = deps.resolve(TOKENS.LinkRepository);
+        const aiSummarizer = deps.resolve(TOKENS.AISummarizer);
+        const contentScraper = deps.resolve(TOKENS.ContentScraper);
+        const notifier = deps.resolve(TOKENS.Notifier);
+        const backgroundTaskRunner = deps.resolve(TOKENS.BackgroundTaskRunner);
+        return new deps.LinkManagementService(
+          linkRepository,
+          aiSummarizer,
+          contentScraper,
+          notifier,
+          backgroundTaskRunner
+        );
+      },
+    },
+    // API Controllers
+    {
+      token: TOKENS.LinkController,
+      importFn: () => import("../../web/api/controllers/link-controller.js"),
+      class: "LinkController",
+      factory: (deps: ServiceDependencies) => {
+        const linkManagementService = deps.resolve(
+          TOKENS.LinkManagementService
+        );
+        return new deps.LinkController(linkManagementService);
+      },
+    },
+    {
+      token: TOKENS.ConfigController,
+      importFn: () => import("../../web/api/controllers/config-controller.js"),
+      class: "ConfigController",
+      factory: (deps: ServiceDependencies) => {
+        return new deps.ConfigController();
+      },
+    },
+    {
+      token: TOKENS.PreviewController,
+      importFn: () => import("../../web/api/controllers/preview-controller.js"),
+      class: "PreviewController",
+      factory: (deps: ServiceDependencies) => {
+        return new deps.PreviewController();
+      },
+    },
+    {
+      token: TOKENS.ApiRouter,
+      importFn: () => import("../../web/api/api-router.js"),
+      class: "ApiRouter",
+      factory: (deps: ServiceDependencies) => {
+        return new deps.ApiRouter();
       },
     },
   ];
