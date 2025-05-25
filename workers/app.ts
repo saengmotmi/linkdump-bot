@@ -5,11 +5,7 @@ import { LinkManagementService } from "../src/link-management/application/link-m
 import { Runtime, TOKENS } from "../src/shared/interfaces/index.js";
 
 export default {
-  async fetch(
-    request: Request,
-    env: any,
-    ctx: ExecutionContext
-  ): Promise<Response> {
+  async fetch(request: Request, env: any, ctx: any): Promise<Response> {
     try {
       // TSyringe 컨테이너 설정
       await setupCloudflareContainer(env, ctx);

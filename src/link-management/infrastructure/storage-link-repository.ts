@@ -1,30 +1,38 @@
-import { LinkRepository } from "../domain/link-repository.js";
-import { Link } from "../domain/link.js";
+import { LinkRepository } from "../domain/link-repository";
+import { Link, LinkStatus } from "../domain/link";
+import { Storage } from "../../shared/interfaces/index.js";
+
+/**
+ * 링크 데이터 컬렉션 인터페이스
+ */
+interface LinksData {
+  links: Link[];
+  lastUpdated?: string;
+}
 
 /**
  * 스토리지 기반 링크 저장소 구현체
  * 도메인의 LinkRepository 인터페이스를 구현합니다.
  */
-export class StorageLinkRepository extends LinkRepository {
-  constructor(storage) {
-    super();
-    this.storage = storage;
-    this.STORAGE_KEY = "links.json";
-  }
+export class StorageLinkRepository implements LinkRepository {
+  private readonly STORAGE_KEY = "links.json";
+
+  constructor(private storage: Storage) {}
 
   /**
    * 스토리지에서 링크 데이터 로드
    */
-  async _loadLinksData() {
+  private async _loadLinksData(): Promise<LinksData> {
     try {
-      const data = await this.storage.get(this.STORAGE_KEY);
+      const data = await this.storage.load(this.STORAGE_KEY);
       if (!data) {
         return { links: [] };
       }
 
-      const parsed = JSON.parse(data);
+      const parsed = typeof data === "string" ? JSON.parse(data) : data;
       return {
-        links: parsed.links.map((linkData) => Link.fromObject(linkData)),
+        links: parsed.links.map((linkData: any) => Link.fromObject(linkData)),
+        lastUpdated: parsed.lastUpdated,
       };
     } catch (error) {
       console.warn("링크 데이터 로드 실패, 빈 데이터로 초기화:", error);
@@ -35,22 +43,19 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * 스토리지에 링크 데이터 저장
    */
-  async _saveLinksData(linksData) {
+  private async _saveLinksData(linksData: LinksData): Promise<void> {
     const serializedData = {
       links: linksData.links.map((link) => link.toObject()),
       lastUpdated: new Date().toISOString(),
     };
 
-    await this.storage.put(
-      this.STORAGE_KEY,
-      JSON.stringify(serializedData, null, 2)
-    );
+    await this.storage.save(this.STORAGE_KEY, serializedData);
   }
 
   /**
    * 모든 링크 조회
    */
-  async findAll() {
+  async findAll(): Promise<Link[]> {
     const data = await this._loadLinksData();
     return data.links;
   }
@@ -58,7 +63,7 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * ID로 링크 조회
    */
-  async findById(id) {
+  async findById(id: string): Promise<Link | null> {
     const data = await this._loadLinksData();
     return data.links.find((link) => link.id === id) || null;
   }
@@ -66,7 +71,7 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * URL로 링크 조회
    */
-  async findByUrl(url) {
+  async findByUrl(url: string): Promise<Link | null> {
     const data = await this._loadLinksData();
     return data.links.find((link) => link.url === url) || null;
   }
@@ -74,7 +79,7 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * 상태별 링크 조회
    */
-  async findByStatus(status) {
+  async findByStatus(status: LinkStatus): Promise<Link[]> {
     const data = await this._loadLinksData();
     return data.links.filter((link) => link.status === status);
   }
@@ -82,7 +87,7 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * 링크 저장
    */
-  async save(link) {
+  async save(link: Link): Promise<Link> {
     const data = await this._loadLinksData();
     const existingIndex = data.links.findIndex((l) => l.id === link.id);
 
@@ -101,7 +106,7 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * 여러 링크 저장
    */
-  async saveAll(links) {
+  async saveAll(links: Link[]): Promise<Link[]> {
     const data = await this._loadLinksData();
 
     for (const link of links) {
@@ -121,7 +126,7 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * 링크 삭제
    */
-  async delete(id) {
+  async delete(id: string): Promise<boolean> {
     const data = await this._loadLinksData();
     const initialLength = data.links.length;
 
@@ -138,7 +143,7 @@ export class StorageLinkRepository extends LinkRepository {
   /**
    * 링크 존재 여부 확인
    */
-  async exists(url) {
+  async exists(url: string): Promise<boolean> {
     const link = await this.findByUrl(url);
     return link !== null;
   }

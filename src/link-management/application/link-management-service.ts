@@ -1,8 +1,8 @@
 import "reflect-metadata";
 import { injectable, inject } from "tsyringe";
-import { LinkDomainService } from "../domain/link-service.js";
+import { LinkDomainService } from "../domain/link-service";
+import { LinkRepository } from "../domain/link-repository";
 import {
-  LinkRepository,
   ContentScraper,
   AISummarizer,
   Notifier,
@@ -51,7 +51,23 @@ export class LinkManagementService {
 
           // Discord로 전송
           if (processedLink.isCompleted()) {
-            await this.discordNotifier.send(processedLink.toDiscordData());
+            await this.discordNotifier.send({
+              id: processedLink.id,
+              url: processedLink.url,
+              title: processedLink.title || undefined,
+              description: processedLink.description || undefined,
+              summary: processedLink.summary || undefined,
+              tags: [...processedLink.tags],
+              createdAt: processedLink.createdAt,
+              processedAt: processedLink.processedAt || undefined,
+              status:
+                processedLink.status === "completed"
+                  ? ("processed" as const)
+                  : (processedLink.status as
+                      | "pending"
+                      | "processed"
+                      | "failed"),
+            });
           }
         } catch (error) {
           console.error(`링크 처리 실패 (${newLink.id}):`, error);
@@ -80,13 +96,28 @@ export class LinkManagementService {
 
       // 성공적으로 처리된 링크들을 Discord로 전송
       const successfulLinks = results
-        .filter((result) => result.success)
-        .map((result) => result.link);
+        .filter((result: any) => result.success)
+        .map((result: any) => result.link);
 
       for (const link of successfulLinks) {
         if (link.isCompleted()) {
           try {
-            await this.discordNotifier.send(link.toDiscordData());
+            // Link 엔티티를 LinkData 형태로 변환하여 전달
+            const linkData = {
+              id: link.id,
+              url: link.url,
+              title: link.title || undefined,
+              description: link.description || undefined,
+              summary: link.summary || undefined,
+              tags: [...link.tags],
+              createdAt: link.createdAt,
+              processedAt: link.processedAt || undefined,
+              status:
+                link.status === "completed"
+                  ? ("processed" as const)
+                  : (link.status as "pending" | "processed" | "failed"),
+            };
+            await this.discordNotifier.send(linkData);
           } catch (error) {
             console.error(`Discord 전송 실패 (${link.id}):`, error);
           }
@@ -97,7 +128,7 @@ export class LinkManagementService {
         success: true,
         processed: results.length,
         successful: successfulLinks.length,
-        failed: results.filter((r) => !r.success).length,
+        failed: results.filter((r: any) => !r.success).length,
         results,
       };
     } catch (error: any) {
@@ -117,7 +148,7 @@ export class LinkManagementService {
 
       return {
         success: true,
-        links: links.map((link) => link.toObject()),
+        links: links.map((link: any) => link.toObject()),
       };
     } catch (error: any) {
       return {
@@ -206,7 +237,20 @@ export class LinkManagementService {
 
       // Discord로 전송
       if (processedLink.isCompleted()) {
-        await this.discordNotifier.send(processedLink.toDiscordData());
+        await this.discordNotifier.send({
+          id: processedLink.id,
+          url: processedLink.url,
+          title: processedLink.title || undefined,
+          description: processedLink.description || undefined,
+          summary: processedLink.summary || undefined,
+          tags: [...processedLink.tags],
+          createdAt: processedLink.createdAt,
+          processedAt: processedLink.processedAt || undefined,
+          status:
+            processedLink.status === "completed"
+              ? ("processed" as const)
+              : (processedLink.status as "pending" | "processed" | "failed"),
+        });
       }
 
       return {

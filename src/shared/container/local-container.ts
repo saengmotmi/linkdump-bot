@@ -31,75 +31,76 @@ export async function setupLocalContainer(config: Partial<Config> = {}) {
   // 설정 등록
   container.registerInstance(TOKENS.Config, localConfig);
 
-  // 스토리지 등록 (로컬은 파일 스토리지)
+  // 스토리지 등록
   const { FileStorage } = await import(
     "../../link-management/infrastructure/storage/file-storage.js"
   );
-  container.register<Storage>(TOKENS.Storage, {
-    useFactory: () => new FileStorage(localConfig.dataPath!),
-  });
+  container.registerInstance(
+    TOKENS.Storage,
+    new FileStorage(localConfig.dataPath!)
+  );
 
-  // AI 클라이언트 등록 (로컬은 OpenAI)
+  // AI 클라이언트 등록
   const { OpenAIClient } = await import(
     "../../link-management/infrastructure/ai-provider/openai-client.js"
   );
-  container.register<AIClient>(TOKENS.AIClient, {
-    useFactory: () => new OpenAIClient(localConfig.openaiApiKey!),
-  });
+  container.registerInstance(
+    TOKENS.AIClient,
+    new OpenAIClient(localConfig.openaiApiKey!)
+  );
 
   // AI 요약기 등록
   const { OpenAISummarizer } = await import(
     "../../link-management/infrastructure/ai-summarizer/openai-summarizer.js"
   );
-  container.register<AISummarizer>(TOKENS.AISummarizer, {
-    useFactory: (c) => {
-      const aiClient = c.resolve<AIClient>(TOKENS.AIClient);
-      return new OpenAISummarizer(aiClient);
-    },
+  const aiClient = container.resolve<AIClient>(TOKENS.AIClient);
+  container.registerInstance(
+    TOKENS.AISummarizer,
+    new OpenAISummarizer(aiClient)
+  );
+
+  // 런타임 등록 (로컬에서는 기본 런타임 사용)
+  container.registerInstance(TOKENS.Runtime, {
+    getCorsHeaders: () => ({
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    }),
   });
 
   // 콘텐츠 스크래퍼 등록
   const { WebContentScraper } = await import(
     "../../link-management/infrastructure/content-scraper/web-scraper.js"
   );
-  container.register<ContentScraper>(TOKENS.ContentScraper, {
-    useFactory: () => new WebContentScraper(),
-  });
+  container.registerInstance(TOKENS.ContentScraper, new WebContentScraper());
 
   // 알림기 등록
   const { DiscordNotifier } = await import(
     "../../link-management/infrastructure/notification/discord-notifier.js"
   );
-  container.register<Notifier>(TOKENS.Notifier, {
-    useFactory: () => new DiscordNotifier(localConfig.discordWebhooks!),
-  });
+  container.registerInstance(
+    TOKENS.Notifier,
+    new DiscordNotifier(localConfig.discordWebhooks!)
+  );
 
-  // 백그라운드 태스크 러너 등록 (로컬용)
+  // 백그라운드 태스크 러너 등록
   const { LocalBackgroundRunner } = await import(
     "../../link-management/infrastructure/background-task/local-background-runner.js"
   );
-  container.register<BackgroundTaskRunner>(TOKENS.BackgroundTaskRunner, {
-    useFactory: () => new LocalBackgroundRunner(),
-  });
-
-  // 런타임 등록 (로컬용 - 더미 구현)
-  container.register<Runtime>(TOKENS.Runtime, {
-    useFactory: () => ({
-      setCorsHeaders: (response: Response) => response,
-      getEnvironment: () => process.env,
-    }),
-  });
+  container.registerInstance(
+    TOKENS.BackgroundTaskRunner,
+    new LocalBackgroundRunner()
+  );
 
   // 링크 저장소 등록
   const { StorageLinkRepository } = await import(
     "../../link-management/infrastructure/storage-link-repository.js"
   );
-  container.register<LinkRepository>(TOKENS.LinkRepository, {
-    useFactory: (c) => {
-      const storage = c.resolve<Storage>(TOKENS.Storage);
-      return new StorageLinkRepository(storage);
-    },
-  });
+  const storage = container.resolve<Storage>(TOKENS.Storage);
+  container.registerInstance(
+    TOKENS.LinkRepository,
+    new StorageLinkRepository(storage)
+  );
 
   return container;
 }

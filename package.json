@@ -2,19 +2,24 @@
   "name": "linkdump-bot",
   "version": "2.0.0",
   "description": "완전 무료 Cloudflare Workers AI 기반 링크 공유 봇",
+  "type": "module",
   "main": "workers/app.js",
   "scripts": {
     "dev": "cd workers && wrangler dev",
     "deploy": "cd workers && wrangler deploy",
     "test": "vitest --run",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "demo": "node quick-test.js",
+    "test:tsyringe": "node test-tsyringe.js",
+    "check:types": "npx tsc --noEmit --skipLibCheck"
   },
   "packageManager": "yarn@4.0.0",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",
     "@types/node": "^22.15.21",
     "@vitest/coverage-v8": "^1.0.0",
+    "typescript": "^5.8.3",
     "vitest": "^1.0.0"
   },
   "keywords": [
