@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { injectable } from "tsyringe";
+import { injectable, inject } from "tsyringe";
 import type { Storage } from "../../../shared/interfaces/index.js";
 
 /**
@@ -10,7 +10,7 @@ import type { Storage } from "../../../shared/interfaces/index.js";
 export class FileStorage implements Storage {
   private basePath: string;
 
-  constructor(basePath: string = "./data") {
+  constructor(@inject("DATA_PATH") basePath: string = "./data") {
     this.basePath = basePath;
     this._ensureDirectory();
   }
