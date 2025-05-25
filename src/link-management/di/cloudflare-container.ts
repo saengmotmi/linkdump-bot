@@ -17,21 +17,13 @@
 
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type { Config } from "../../shared/interfaces/index.js";
+import type { Config, CloudflareEnv } from "../../shared/interfaces/index.js";
 import { TOKENS } from "../../shared/interfaces/index.js";
 import {
   setupContainer,
   type ServiceConfig,
   type ServiceDependencies,
 } from "../../shared/container/service-registry.js";
-
-// Cloudflare Workers 환경 타입 정의
-interface CloudflareEnv {
-  LINKDUMP_STORAGE: R2Bucket;
-  AI: Ai;
-  DISCORD_WEBHOOKS?: string;
-  OPENAI_API_KEY?: string;
-}
 
 /**
  * Cloudflare Workers 서비스 설정 정의
