@@ -37,29 +37,38 @@ function createCloudflareServiceConfig(
     // 설정 객체 - 환경별 설정값만 포함
     {
       token: TOKENS.Config,
-      factory: () => ({
+      importFn: async () => ({
         webhookUrls: env.DISCORD_WEBHOOKS
           ? env.DISCORD_WEBHOOKS.split(",")
           : [],
         env,
         ctx,
       }),
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.Storage,
-      importFn: () => import("../infrastructure/storage/r2-storage.js"),
-      class: "R2Storage",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.R2Storage(env.LINKDUMP_STORAGE);
+      importFn: async () => {
+        const { R2Storage } = await import(
+          "../infrastructure/storage/r2-storage.js"
+        );
+        return new R2Storage(env.LINKDUMP_STORAGE as any);
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.LinkRepository,
-      importFn: () => import("../infrastructure/storage-link-repository.js"),
-      class: "StorageLinkRepository",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
+      importFn: async () => {
+        const { StorageLinkRepository } = await import(
+          "../infrastructure/storage-link-repository.js"
+        );
+        const storage = container.resolve(TOKENS.Storage) as any;
+        return new StorageLinkRepository(storage);
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.AIClient,
@@ -103,70 +112,82 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.ContentScraper,
-      importFn: () =>
-        import("../infrastructure/content-scraper/web-scraper.js"),
-      class: "WebContentScraper",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.WebContentScraper();
+      importFn: async () => {
+        const { WebContentScraper } = await import(
+          "../infrastructure/content-scraper/web-scraper.js"
+        );
+        return new WebContentScraper();
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.Notifier,
-      importFn: () =>
-        import("../infrastructure/notification/discord-notifier.js"),
-      class: "DiscordNotifier",
-      factory: (deps: ServiceDependencies) => {
-        const config = deps.resolve<Config>(TOKENS.Config);
-        return new deps.DiscordNotifier(config.webhookUrls || []);
+      importFn: async () => {
+        const { DiscordNotifier } = await import(
+          "../infrastructure/notification/discord-notifier.js"
+        );
+        const config = container.resolve(TOKENS.Config) as any;
+        return new DiscordNotifier(config.webhookUrls || []);
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.TaskQueue,
-      importFn: () => import("../../shared/queue/memory-task-queue.js"),
-      class: "MemoryTaskQueue",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.MemoryTaskQueue();
+      importFn: async () => {
+        const { MemoryTaskQueue } = await import(
+          "../../shared/queue/memory-task-queue.js"
+        );
+        return new MemoryTaskQueue();
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.QueueProcessor,
-      importFn: () =>
-        import("../../shared/queue/sequential-queue-processor.js"),
-      class: "SequentialQueueProcessor",
-      factory: (deps: ServiceDependencies) => {
-        const taskQueue = deps.resolve(TOKENS.TaskQueue);
-        return new deps.SequentialQueueProcessor(taskQueue);
+      importFn: async () => {
+        const { SequentialQueueProcessor } = await import(
+          "../../shared/queue/sequential-queue-processor.js"
+        );
+        const taskQueue = container.resolve(TOKENS.TaskQueue) as any;
+        return new SequentialQueueProcessor(taskQueue);
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.BackgroundTaskRunner,
-      importFn: () =>
-        import(
+      importFn: async () => {
+        const { WorkersBackgroundRunner } = await import(
           "../infrastructure/background-task/workers-background-runner.js"
-        ),
-      class: "WorkersBackgroundRunner",
-      factory: (deps: ServiceDependencies) => {
-        const taskQueue = deps.resolve(TOKENS.TaskQueue);
-        const queueProcessor = deps.resolve(TOKENS.QueueProcessor);
-        return new deps.WorkersBackgroundRunner(
-          { env, ctx },
+        );
+        const taskQueue = container.resolve(TOKENS.TaskQueue) as any;
+        const queueProcessor = container.resolve(TOKENS.QueueProcessor) as any;
+        return new WorkersBackgroundRunner(
+          { env, ctx: ctx as any },
           taskQueue,
           queueProcessor
         );
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     // Application Services
     {
       token: TOKENS.LinkManagementService,
-      importFn: () => import("../application/link-management-service.js"),
-      class: "LinkManagementService",
-      factory: (deps: ServiceDependencies) => {
-        const linkRepository = deps.resolve(TOKENS.LinkRepository);
-        const aiSummarizer = deps.resolve(TOKENS.AISummarizer);
-        const contentScraper = deps.resolve(TOKENS.ContentScraper);
-        const notifier = deps.resolve(TOKENS.Notifier);
-        const backgroundTaskRunner = deps.resolve(TOKENS.BackgroundTaskRunner);
-        return new deps.LinkManagementService(
+      importFn: async () => {
+        const { LinkManagementService } = await import(
+          "../application/link-management-service.js"
+        );
+        const linkRepository = container.resolve(TOKENS.LinkRepository) as any;
+        const aiSummarizer = container.resolve(TOKENS.AISummarizer) as any;
+        const contentScraper = container.resolve(TOKENS.ContentScraper) as any;
+        const notifier = container.resolve(TOKENS.Notifier) as any;
+        const backgroundTaskRunner = container.resolve(
+          TOKENS.BackgroundTaskRunner
+        ) as any;
+        return new LinkManagementService(
           linkRepository,
           aiSummarizer,
           contentScraper,
@@ -174,42 +195,54 @@ function createCloudflareServiceConfig(
           backgroundTaskRunner
         );
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     // API Controllers
     {
       token: TOKENS.LinkController,
-      importFn: () => import("../../web/api/controllers/link-controller.js"),
-      class: "LinkController",
-      factory: (deps: ServiceDependencies) => {
-        const linkManagementService = deps.resolve(
-          TOKENS.LinkManagementService
+      importFn: async () => {
+        const { LinkController } = await import(
+          "../../web/api/controllers/link-controller.js"
         );
-        return new deps.LinkController(linkManagementService);
+        const linkManagementService = container.resolve(
+          TOKENS.LinkManagementService
+        ) as any;
+        return new LinkController(linkManagementService);
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.ConfigController,
-      importFn: () => import("../../web/api/controllers/config-controller.js"),
-      class: "ConfigController",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.ConfigController();
+      importFn: async () => {
+        const { ConfigController } = await import(
+          "../../web/api/controllers/config-controller.js"
+        );
+        return new ConfigController();
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.PreviewController,
-      importFn: () => import("../../web/api/controllers/preview-controller.js"),
-      class: "PreviewController",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.PreviewController();
+      importFn: async () => {
+        const { PreviewController } = await import(
+          "../../web/api/controllers/preview-controller.js"
+        );
+        return new PreviewController();
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.ApiRouter,
-      importFn: () => import("../../web/api/api-router.js"),
-      class: "ApiRouter",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.ApiRouter();
+      importFn: async () => {
+        const { ApiRouter } = await import("../../web/api/api-router.js");
+        return new ApiRouter();
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
   ];
 }
