@@ -26,10 +26,19 @@ export interface Storage {
 }
 
 /**
+ * AI 클라이언트 옵션
+ */
+export interface AIOptions {
+  maxTokens?: number;
+  temperature?: number;
+  model?: string;
+}
+
+/**
  * AI 클라이언트 인터페이스
  */
 export interface AIClient {
-  generateText(prompt: string, options?: any): Promise<string>;
+  generateText(prompt: string, options?: AIOptions): Promise<string>;
 }
 
 /**

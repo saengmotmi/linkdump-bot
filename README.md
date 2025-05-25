@@ -68,6 +68,103 @@ src/
     └── app.ts              # TSyringe-powered Workers app
 ```
 
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- npm or yarn
+
+### Installation & Setup
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd linkdump-bot
+
+# Install dependencies
+npm install
+
+# Run demo (TypeScript executed directly with TSX)
+npm run demo
+
+# Start development with watch mode
+npm run dev
+
+# Type checking
+npm run check:types
+```
+
+### 🔥 **TSX Integration - Zero Compilation Development**
+
+This project uses **TSX** for direct TypeScript execution without compilation:
+
+```bash
+# Development with auto-reload
+npm run dev          # tsx --watch workers/app.ts
+
+# Direct execution
+npm run start        # tsx workers/app.ts
+
+# Run any TypeScript file directly
+npx tsx your-file.ts
+```
+
+**Benefits:**
+
+- ⚡ **5x faster** than traditional tsc compilation
+- 🔄 **Instant reload** on file changes
+- 🎯 **Zero configuration** - works out of the box
+- 🛡️ **Type safety** maintained during development
+
+## 🎯 Key Features
+
+### ✨ **Type-Safe Dependency Injection**
+
+```typescript
+@injectable()
+export class LinkManagementService {
+  constructor(
+    @inject(TOKENS.LinkRepository) private linkRepo: LinkRepository,
+    @inject(TOKENS.AIClient) private aiClient: AIClient,
+    @inject(TOKENS.Notifier) private notifier: Notifier
+  ) {}
+}
+```
+
+### 🔧 **Dynamic Environment Configuration**
+
+```typescript
+// Cloudflare Workers
+await setupCloudflareContainer(env, ctx);
+const service = container.resolve(LinkManagementService);
+
+// Local Development
+await setupLocalContainer({ openaiApiKey: "..." });
+const service = container.resolve(LinkManagementService);
+```
+
+### ⚡ **Optimized Bundle Size**
+
+- **Dynamic imports** - Only load what you need
+- **Tree shaking** - Eliminate unused code
+- **Environment-specific** - No unnecessary dependencies
+
+### 🏗️ **Clean Architecture**
+
+```
+src/
+├── shared/
+│   ├── interfaces/           # TypeScript interfaces & DI tokens
+│   └── container/           # Environment-specific DI setup
+├── link-management/
+│   ├── domain/              # Business logic
+│   ├── application/         # Use cases (with @injectable)
+│   └── infrastructure/      # External services
+└── workers/
+    └── app.ts              # TSyringe-powered Workers app
+```
+
 ## 🛠️ Quick Start
 
 ### 1. **Installation**

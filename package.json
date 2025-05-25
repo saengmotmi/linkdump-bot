@@ -5,20 +5,20 @@
   "type": "module",
   "main": "workers/app.js",
   "scripts": {
-    "dev": "cd workers && wrangler dev",
-    "deploy": "cd workers && wrangler deploy",
-    "test": "vitest --run",
-    "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage",
-    "demo": "node quick-test.js",
-    "test:tsyringe": "node test-tsyringe.js",
-    "check:types": "npx tsc --noEmit --skipLibCheck"
+    "dev": "tsx --watch workers/app.ts",
+    "start": "tsx workers/app.ts",
+    "demo": "tsx quick-test.ts",
+    "test": "tsx test/*.ts",
+    "check:types": "tsc --noEmit",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts,.js"
   },
   "packageManager": "yarn@4.0.0",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",
     "@types/node": "^22.15.21",
     "@vitest/coverage-v8": "^1.0.0",
+    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vitest": "^1.0.0"
   },
