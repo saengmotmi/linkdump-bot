@@ -22,8 +22,17 @@ export class PreviewController {
    */
   async getPreview(request: Request): Promise<Response> {
     const result = await ApiErrorHandler.wrapAsync(async () => {
-      const url = new URL(request.url);
-      const targetUrl = url.searchParams.get("url");
+      let targetUrl: string;
+
+      // POST 요청의 경우 JSON body에서 URL 추출
+      if (request.method === "POST") {
+        const body = (await request.json()) as { url?: string };
+        targetUrl = body.url || "";
+      } else {
+        // GET 요청의 경우 쿼리 파라미터에서 URL 추출 (하위 호환성)
+        const url = new URL(request.url);
+        targetUrl = url.searchParams.get("url") || "";
+      }
 
       if (!targetUrl) {
         throw new ValidationError("URL parameter is required");
