@@ -184,8 +184,8 @@ function createCloudflareServiceConfig(
         );
         return new LinkManagementService(
           linkRepository,
-          aiSummarizer,
           contentScraper,
+          aiSummarizer,
           notifier,
           backgroundTaskRunner
         );
