@@ -44,26 +44,6 @@ export class WorkersAIClient implements AIClient {
   }
 
   /**
-   * AI 모델을 사용하여 텍스트를 요약합니다.
-   */
-  async summarizeText(text: string, options: AIOptions = {}): Promise<string> {
-    const prompt = `다음 텍스트를 간결하게 요약해주세요:\n\n${text}`;
-
-    try {
-      const response = await this.ai.run(this.defaultModel, {
-        prompt,
-        max_tokens: options.maxTokens || 256,
-        temperature: options.temperature || 0.5,
-      });
-
-      return this.parseResponse(response);
-    } catch (error) {
-      console.error("AI 텍스트 요약 실패:", error);
-      throw new Error("AI 텍스트 요약에 실패했습니다.");
-    }
-  }
-
-  /**
    * AI 응답을 파싱합니다.
    */
   private parseResponse(response: AiTextGenerationOutput): string {
