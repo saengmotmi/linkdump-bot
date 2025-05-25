@@ -30,6 +30,8 @@ export interface LinkProcessingData {
   summary: string;
 }
 
+import type { LinkData } from "../../shared/interfaces/index.js";
+
 /**
  * 링크 도메인 엔티티
  * 링크의 핵심 비즈니스 규칙과 불변성을 보장합니다.
@@ -209,5 +211,40 @@ export class Link {
       createdAt: new Date(obj.createdAt),
       processedAt: obj.processedAt ? new Date(obj.processedAt) : null,
     });
+  }
+
+  /**
+   * LinkData 인터페이스로 변환 (알림 전송용)
+   * Link 엔티티의 상태를 LinkData 형태로 변환합니다.
+   */
+  toLinkData(): LinkData {
+    return {
+      id: this.id,
+      url: this.url,
+      title: this.title || undefined,
+      description: this.description || undefined,
+      summary: this.summary || undefined,
+      tags: [...this.tags],
+      createdAt: this.createdAt,
+      processedAt: this.processedAt || undefined,
+      status: this.mapStatusToLinkDataStatus(),
+    };
+  }
+
+  /**
+   * Link 엔티티의 status를 LinkData의 status로 매핑
+   */
+  private mapStatusToLinkDataStatus(): "pending" | "processed" | "failed" {
+    switch (this.status) {
+      case "completed":
+        return "processed";
+      case "pending":
+      case "processing":
+        return "pending";
+      case "failed":
+        return "failed";
+      default:
+        return "pending";
+    }
   }
 }
