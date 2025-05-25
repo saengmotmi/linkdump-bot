@@ -4,10 +4,17 @@
   "description": "완전 무료 Cloudflare Workers AI 기반 링크 공유 봇",
   "main": "workers/complete-app.js",
   "scripts": {
-    "deploy": "cd workers && wrangler deploy"
+    "deploy": "cd workers && wrangler deploy",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage"
   },
   "dependencies": {},
-  "devDependencies": {},
+  "devDependencies": {
+    "vitest": "^1.0.0",
+    "@cloudflare/workers-types": "^4.20231218.0",
+    "@vitest/coverage-v8": "^1.0.0"
+  },
   "keywords": ["discord", "bot", "automation", "links", "cloudflare", "workers-ai", "무료"],
   "author": "",
   "license": "MIT"
