@@ -1,13 +1,16 @@
 import "reflect-metadata";
 import { injectable, inject } from "tsyringe";
-import { LinkDomainService } from "../domain/link-service.js";
+import {
+  LinkDomainService,
+  LinkProcessingResult,
+} from "../domain/link-service.js";
 import { LinkRepository } from "../domain/link-repository.js";
+import { Link } from "../domain/link.js";
 import {
   ContentScraper,
   AISummarizer,
   Notifier,
   BackgroundTaskRunner,
-  LinkData,
   TOKENS,
 } from "../../shared/interfaces/index.js";
 
@@ -40,7 +43,7 @@ export class LinkManagementService {
    * @param context 로깅용 컨텍스트 (선택사항)
    */
   private async sendNotificationIfCompleted(
-    link: any,
+    link: Link,
     context?: string
   ): Promise<void> {
     if (link.isCompleted()) {
@@ -97,8 +100,8 @@ export class LinkManagementService {
 
       // 성공적으로 처리된 링크들을 알림으로 전송
       const successfulLinks = results
-        .filter((result: any) => result.success)
-        .map((result: any) => result.link);
+        .filter((result: LinkProcessingResult) => result.success)
+        .map((result: LinkProcessingResult) => result.link);
 
       for (const link of successfulLinks) {
         await this.sendNotificationIfCompleted(link, "processAllLinks");
@@ -108,7 +111,7 @@ export class LinkManagementService {
         success: true,
         processed: results.length,
         successful: successfulLinks.length,
-        failed: results.filter((r: any) => !r.success).length,
+        failed: results.filter((r: LinkProcessingResult) => !r.success).length,
         results,
       };
     } catch (error: any) {
@@ -128,7 +131,7 @@ export class LinkManagementService {
 
       return {
         success: true,
-        links: links.map((link: any) => link.toObject()),
+        links: links.map((link: Link) => link.toObject()),
       };
     } catch (error: any) {
       return {
