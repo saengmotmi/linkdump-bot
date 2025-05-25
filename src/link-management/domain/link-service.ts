@@ -3,6 +3,15 @@ import { LinkRepository } from "./link-repository.js";
 import { ContentScraper, AISummarizer } from "../../shared/interfaces/index.js";
 
 /**
+ * 링크 처리 결과 인터페이스
+ */
+export interface LinkProcessingResult {
+  success: boolean;
+  link: Link;
+  error?: string;
+}
+
+/**
  * 링크 도메인 서비스
  * 복잡한 비즈니스 로직과 엔티티 간의 상호작용을 처리합니다.
  */
@@ -94,16 +103,24 @@ export class LinkDomainService {
   /**
    * 모든 대기 중인 링크 처리
    */
-  async processAllPendingLinks(): Promise<Link[]> {
+  async processAllPendingLinks(): Promise<LinkProcessingResult[]> {
     const pendingLinks = await this.linkRepository.findByStatus("pending");
-    const results: Link[] = [];
+    const results: LinkProcessingResult[] = [];
 
     for (const link of pendingLinks) {
       try {
         const processedLink = await this.processLink(link.id);
-        results.push(processedLink);
+        results.push({
+          success: true,
+          link: processedLink,
+        });
       } catch (error) {
         console.error(`링크 처리 실패 (${link.id}):`, error);
+        results.push({
+          success: false,
+          link: link,
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
