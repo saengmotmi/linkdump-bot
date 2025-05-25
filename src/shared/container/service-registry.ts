@@ -12,89 +12,32 @@
 
 import { container } from "tsyringe";
 
-// 서비스 의존성 타입 정의
-export type ServiceDependencies = {
-  resolve<T = unknown>(token: symbol): T;
-} & {
-  [className: string]: new (...args: any[]) => any; // 동적으로 로드되는 클래스들
-};
-
 export interface ServiceConfig {
   token: symbol;
-  importFn?: () => Promise<any>; // 모듈 또는 인스턴스를 반환
-  class?: string;
-  factory: (deps: ServiceDependencies) => any;
-  // 새로운 방식: importFn이 인스턴스를 직접 반환하는 경우
-  isDirectInstance?: boolean;
+  importFn: () => Promise<any>; // 인스턴스를 직접 반환
+  isDirectInstance: boolean; // 항상 true
+  factory: () => void; // 사용되지 않음 (하위 호환성을 위해 유지)
 }
 
 /**
- * 의존성 로드 및 클래스 매핑
- */
-export async function loadDependencies(
-  serviceConfig: ServiceConfig[]
-): Promise<Record<string, new (...args: any[]) => any>> {
-  // 의존성 로드
-  const imports = await Promise.all(
-    serviceConfig
-      .filter((service) => service.importFn)
-      .map((service) => service.importFn!())
-  );
-
-  // 클래스 매핑
-  const classes: Record<string, new (...args: any[]) => any> = {};
-  serviceConfig.forEach((service, index) => {
-    if (service.class && service.importFn) {
-      const importIndex = serviceConfig
-        .slice(0, index)
-        .filter((s) => s.importFn).length;
-      classes[service.class] = imports[importIndex][service.class];
-    }
-  });
-
-  return classes;
-}
-
-/**
- * 서비스 등록
+ * 서비스 등록 - 단순화된 버전
  */
 export async function registerServices(
-  serviceConfig: ServiceConfig[],
-  deps: ServiceDependencies
+  serviceConfig: ServiceConfig[]
 ): Promise<void> {
   for (const service of serviceConfig) {
-    let instance;
-
-    if (service.isDirectInstance && service.importFn) {
-      // importFn이 인스턴스를 직접 반환하는 경우
-      instance = await service.importFn();
-    } else {
-      // 기존 방식: factory 함수 사용
-      instance = await service.factory(deps);
-    }
-
+    // importFn이 인스턴스를 직접 반환
+    const instance = await service.importFn();
     container.registerInstance(service.token, instance);
   }
 }
 
 /**
- * 서비스 설정을 기반으로 컨테이너 설정
+ * 서비스 설정을 기반으로 컨테이너 설정 - 단순화된 버전
  */
 export async function setupContainer(
-  serviceConfig: ServiceConfig[],
-  additionalDeps: Record<string, any> = {}
+  serviceConfig: ServiceConfig[]
 ): Promise<void> {
-  // 의존성 로드
-  const classes = await loadDependencies(serviceConfig);
-
-  // 의존성 컨텍스트 준비
-  const deps: ServiceDependencies = {
-    ...classes,
-    ...additionalDeps,
-    // 동적 인스턴스 해결을 위한 헬퍼
-    resolve: <T = unknown>(token: symbol): T => container.resolve<T>(token),
-  } as ServiceDependencies;
-
   // 서비스 등록
-  await registerServices(serviceConfig, deps);
+  await registerServices(serviceConfig);
 }

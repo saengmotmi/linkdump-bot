@@ -23,7 +23,6 @@ import { TOKENS } from "../../shared/interfaces/index.js";
 import {
   setupContainer,
   type ServiceConfig,
-  type ServiceDependencies,
 } from "../../shared/container/service-registry.js";
 
 /**
