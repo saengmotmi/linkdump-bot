@@ -53,6 +53,8 @@ export default {
           response = await handleGetConfig(env);
         } else if (url.pathname === "/api/links" && method === "GET") {
           response = await handleGetLinks(linkManagementService);
+        } else if (url.pathname === "/api/preview" && method === "POST") {
+          response = await handlePreviewRequest(request);
         } else {
           response = new Response("Not Found", { status: 404 });
         }
@@ -220,6 +222,100 @@ async function handleGetConfig(env: Env): Promise<Response> {
 }
 
 /**
+ * 링크 미리보기 핸들러
+ */
+async function handlePreviewRequest(request: Request): Promise<Response> {
+  try {
+    const { url } = (await request.json()) as { url: string };
+
+    if (!url) {
+      return new Response(
+        JSON.stringify({ success: false, error: "URL is required" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    // 컨테이너에서 서비스들 가져오기
+    const contentScraper = container.resolve(TOKENS.ContentScraper) as any;
+    const aiSummarizer = container.resolve(TOKENS.AISummarizer) as any;
+
+    // 콘텐츠 스크래핑
+    const scrapedData = await contentScraper.scrape(url);
+
+    // AI 타이틀 생성 (가능한 경우)
+    let title = scrapedData.title || "";
+    if (
+      "generateTitle" in aiSummarizer &&
+      typeof aiSummarizer.generateTitle === "function"
+    ) {
+      try {
+        title = await aiSummarizer.generateTitle({
+          url,
+          title: scrapedData.title,
+          description: scrapedData.description,
+          content: scrapedData.content,
+        });
+      } catch (error) {
+        console.warn("AI 타이틀 생성 실패:", error);
+        // 폴백 타이틀 생성
+        if (!title) {
+          try {
+            const urlObj = new URL(url);
+            const hostname = urlObj.hostname;
+            if (
+              hostname.includes("x.com") ||
+              hostname.includes("twitter.com")
+            ) {
+              title = "트윗";
+            } else {
+              title = hostname.replace("www.", "");
+            }
+          } catch {
+            title = "링크";
+          }
+        }
+      }
+    }
+
+    // AI 요약 생성
+    let summary = "";
+    try {
+      summary = await aiSummarizer.summarize({
+        url,
+        title: scrapedData.title,
+        description: scrapedData.description,
+      });
+    } catch (error) {
+      console.warn("AI 요약 생성 실패:", error);
+      summary = scrapedData.description || "요약을 생성할 수 없습니다.";
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        preview: {
+          url,
+          title,
+          description: scrapedData.description || "",
+          summary,
+        },
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ success: false, error: errorMessage }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+/**
  * 웹 페이지 생성
  */
 function getWebPage(): Response {
@@ -229,7 +325,7 @@ function getWebPage(): Response {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LinkDump Bot - TSyringe Edition</title>
+    <title>🔗 LinkDump Bot</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -248,128 +344,344 @@ function getWebPage(): Response {
             box-shadow: 0 20px 40px rgba(0,0,0,0.1);
             max-width: 600px;
             width: 100%;
-            text-align: center;
-        }
-        .badge {
-            display: inline-block;
-            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
         h1 {
             color: #2c3e50;
             margin-bottom: 10px;
-            font-size: 2.5em;
+            font-size: 2.2em;
             font-weight: 700;
+            text-align: center;
         }
         .subtitle {
             color: #7f8c8d;
             margin-bottom: 30px;
             font-size: 1.1em;
+            text-align: center;
         }
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin: 30px 0;
+        .form-group {
+            margin-bottom: 20px;
         }
-        .feature {
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        input[type="url"], input[type="text"] {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="url"]:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            width: 100%;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-submit {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+        }
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .url-input-container {
+            position: relative;
+        }
+        .url-loading {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: none;
+        }
+        .url-loading.show {
+            display: block;
+        }
+        .url-loading::after {
+            content: '';
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        .preview-card {
             background: #f8f9fa;
-            padding: 20px;
+            border: 1px solid #dee2e6;
             border-radius: 12px;
-            border-left: 4px solid #3498db;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
         }
-        .feature h3 {
+        .preview-card.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .preview-title {
+            font-size: 1.2em;
+            font-weight: 600;
             color: #2c3e50;
             margin-bottom: 8px;
-            font-size: 1.1em;
         }
-        .feature p {
-            color: #7f8c8d;
-            font-size: 0.9em;
+        .preview-description {
+            color: #6c757d;
+            margin-bottom: 12px;
             line-height: 1.5;
         }
-        .api-section {
-            margin-top: 40px;
-            padding-top: 30px;
-            border-top: 2px solid #ecf0f1;
+        .preview-summary {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            font-style: italic;
+            color: #495057;
         }
-        .api-title {
-            color: #2c3e50;
-            margin-bottom: 20px;
-            font-size: 1.3em;
+        .preview-url {
+            font-size: 0.9em;
+            color: #6c757d;
+            word-break: break-all;
+            margin-bottom: 12px;
         }
-        .endpoints {
-            display: grid;
-            gap: 10px;
-            text-align: left;
-        }
-        .endpoint {
-            background: #2c3e50;
-            color: white;
+        .message {
             padding: 12px 16px;
             border-radius: 8px;
-            font-family: 'Monaco', 'Menlo', monospace;
-            font-size: 0.9em;
+            margin-bottom: 20px;
+            display: none;
         }
-        .method {
-            color: #e74c3c;
-            font-weight: bold;
+        .message.show {
+            display: block;
         }
-        .footer {
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid #ecf0f1;
-            color: #95a5a6;
-            font-size: 0.9em;
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="badge">TSyringe-Powered</div>
-        <h1>🔗 LinkDump Bot</h1>
-        <p class="subtitle">Professional Dependency Injection with TypeScript</p>
+        <h1>🔗 링크 추가</h1>
+        <p class="subtitle">링크를 추가하면 자동으로 AI 요약을 생성하여 등록된 Discord 채널로 전송됩니다.</p>
         
-        <div class="features">
-            <div class="feature">
-                <h3>🎯 Type Safety</h3>
-                <p>Complete TypeScript interfaces with compile-time type checking</p>
+        <form id="linkForm">
+            <div class="form-group">
+                <label for="url">링크 URL</label>
+                <div class="url-input-container">
+                    <input type="url" id="url" name="url" placeholder="https://example.com" required>
+                    <span class="url-loading"></span>
+                </div>
             </div>
-            <div class="feature">
-                <h3>🔧 TSyringe DI</h3>
-                <p>Industry-standard dependency injection with decorators</p>
+            
+            <div class="form-group">
+                <label for="tags">태그 (선택사항)</label>
+                <input type="text" id="tags" name="tags" placeholder="기술, AI, 개발">
             </div>
-            <div class="feature">
-                <h3>⚡ Dynamic Imports</h3>
-                <p>Optimized bundle size with lazy loading</p>
+            
+            <div class="button-group">
+                <button type="submit" id="submitBtn" class="btn-submit">링크 추가하기</button>
             </div>
-            <div class="feature">
-                <h3>🏗️ Clean Architecture</h3>
-                <p>Domain-driven design with clear separation of concerns</p>
-            </div>
+        </form>
+        
+        <div id="previewCard" class="preview-card">
+            <div class="preview-url" id="previewUrl"></div>
+            <div class="preview-title" id="previewTitle"></div>
+            <div class="preview-description" id="previewDescription"></div>
+            <div class="preview-summary" id="previewSummary"></div>
         </div>
-
-        <div class="api-section">
-            <h2 class="api-title">🚀 API Endpoints</h2>
-            <div class="endpoints">
-                <div class="endpoint"><span class="method">POST</span> /api/add-link</div>
-                <div class="endpoint"><span class="method">GET</span> /api/links</div>
-                <div class="endpoint"><span class="method">POST</span> /api/process-links</div>
-                <div class="endpoint"><span class="method">GET</span> /api/config</div>
-            </div>
-        </div>
-
-        <div class="footer">
-            <p>Powered by TSyringe • Cloudflare Workers • TypeScript</p>
-        </div>
+        
+        <div id="message" class="message"></div>
     </div>
+
+    <script>
+        const form = document.getElementById('linkForm');
+        const urlInput = document.getElementById('url');
+        const tagsInput = document.getElementById('tags');
+        const submitBtn = document.getElementById('submitBtn');
+        const previewCard = document.getElementById('previewCard');
+        const message = document.getElementById('message');
+        const urlLoading = document.querySelector('.url-loading');
+
+        let previewTimeout;
+        let currentPreviewUrl = '';
+
+        // URL 입력 시 자동 미리보기
+        urlInput.addEventListener('input', () => {
+            const url = urlInput.value.trim();
+            
+            // 이전 타이머 취소
+            if (previewTimeout) {
+                clearTimeout(previewTimeout);
+            }
+
+            // URL이 비어있으면 미리보기 숨기기
+            if (!url) {
+                hidePreview();
+                currentPreviewUrl = '';
+                return;
+            }
+
+            // 유효한 URL인지 확인
+            try {
+                new URL(url);
+            } catch {
+                // 유효하지 않은 URL이면 미리보기 숨기기
+                hidePreview();
+                currentPreviewUrl = '';
+                return;
+            }
+
+            // 같은 URL이면 다시 요청하지 않음
+            if (url === currentPreviewUrl) {
+                return;
+            }
+
+            // 1초 후에 미리보기 생성
+            previewTimeout = setTimeout(() => {
+                generatePreview(url);
+            }, 1000);
+        });
+
+        // 미리보기 생성 함수
+        async function generatePreview(url) {
+            if (!url || url === currentPreviewUrl) return;
+
+            currentPreviewUrl = url;
+            urlLoading.classList.add('show');
+            hidePreview();
+
+            try {
+                const response = await fetch('/api/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                const result = await response.json();
+
+                // URL이 변경되었으면 결과 무시
+                if (url !== currentPreviewUrl) return;
+
+                if (result.success) {
+                    showPreview(result.preview);
+                } else {
+                    console.warn('미리보기 생성 실패:', result.error);
+                    hidePreview();
+                }
+            } catch (error) {
+                console.warn('미리보기 생성 중 오류:', error);
+                hidePreview();
+            } finally {
+                urlLoading.classList.remove('show');
+            }
+        }
+
+        // 폼 제출
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const url = urlInput.value.trim();
+            const tags = tagsInput.value.trim().split(',').map(tag => tag.trim()).filter(tag => tag);
+            
+            if (!url) {
+                showMessage('URL을 입력해주세요.', 'error');
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span> 처리 중...';
+
+            try {
+                const response = await fetch('/api/add-link', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, tags })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('링크가 성공적으로 추가되었습니다! 백그라운드에서 처리 중입니다.', 'success');
+                    form.reset();
+                    hidePreview();
+                } else {
+                    showMessage('링크 추가 실패: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showMessage('링크 추가 중 오류가 발생했습니다.', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '링크 추가하기';
+            }
+        });
+
+        function showPreview(preview) {
+            document.getElementById('previewUrl').textContent = preview.url;
+            document.getElementById('previewTitle').textContent = preview.title || '제목 없음';
+            document.getElementById('previewDescription').textContent = preview.description || '설명 없음';
+            document.getElementById('previewSummary').textContent = preview.summary || '요약 없음';
+            
+            previewCard.classList.add('show');
+        }
+
+        function hidePreview() {
+            previewCard.classList.remove('show');
+        }
+
+        function showMessage(text, type) {
+            message.textContent = text;
+            message.className = 'message show ' + type;
+            setTimeout(() => {
+                message.classList.remove('show');
+            }, 5000);
+        }
+    </script>
 </body>
 </html>`;
 

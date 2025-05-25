@@ -1,178 +1,123 @@
 # 🔗 LinkDump Bot
 
-TypeScript 기반의 링크 수집 및 요약 봇입니다. TSyringe를 사용한 의존성 주입으로 깔끔한 아키텍처를 구현했습니다.
+TypeScript와 TSyringe 의존성 주입, Cloudflare Workers를 사용한 강력한 링크 관리 봇입니다.
 
 ## ✨ 주요 기능
 
-- 🔗 **링크 자동 수집**: URL을 추가하면 자동으로 메타데이터 추출
-- 🤖 **AI 요약**: Cloudflare Workers AI로 콘텐츠 자동 요약
-- 📢 **Discord 알림**: 처리 완료된 링크를 Discord로 전송
-- 🏗️ **Clean Architecture**: TSyringe 기반 의존성 주입
-- ⚡ **멀티 환경**: Cloudflare Workers와 로컬 개발 지원
+- 🔗 링크 수집 및 관리
+- 🤖 Discord 웹훅 연동
+- 🧠 AI 기반 링크 처리 (선택사항)
+- 📊 링크 분석 및 분류
+- 🚀 Cloudflare Workers 서버리스 배포
+- 💉 의존성 주입을 통한 깔끔한 아키텍처
 
-## 🚀 빠른 시작
+## 환경 설정
 
-### 1. 설치
+### 1. 환경 변수 설정
+
+예시 환경 파일을 복사하고 설정을 구성하세요:
 
 ```bash
-npm install
+cp .env.example .env
 ```
 
-### 2. 환경 설정
+`.env` 파일을 본인의 값으로 수정하세요:
 
-#### Cloudflare Workers 배포
+```env
+# Cloudflare Workers 배포 정보
+WORKER_URL=https://your-worker-name.your-subdomain.workers.dev
+
+# 개발 환경 설정
+DEV_PORT=8787
+DEV_URL=http://localhost:8787
+
+# Discord Webhook URLs (배포 시 wrangler secret으로 설정)
+DISCORD_WEBHOOKS=https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN
+
+# OpenAI API Key (선택사항)
+OPENAI_API_KEY=sk-your-openai-api-key
+
+# 기타 설정
+NODE_ENV=development
+```
+
+### 2. Cloudflare Workers 시크릿 설정
+
+프로덕션 배포를 위해 민감한 값들을 Wrangler 시크릿으로 설정하세요:
 
 ```bash
-# Discord 웹훅 설정 (필수)
+# Discord Webhook URLs
+cd workers
 wrangler secret put DISCORD_WEBHOOKS
 
-# 입력 예시: ["https://discord.com/api/webhooks/..."]
+# OpenAI API Key (선택사항)
+wrangler secret put OPENAI_API_KEY
 ```
 
-#### 로컬 개발
+## 빠른 시작
+
+### 개발
 
 ```bash
-# .env 파일 생성
-DISCORD_WEBHOOKS=["https://discord.com/api/webhooks/..."]
+# 의존성 설치
+npm install
+
+# 로컬 개발 서버 시작
+npm run dev:local
+
+# 또는 Cloudflare Workers 원격 환경으로 시작
+npm run dev:remote
+
+# 배포된 워커를 브라우저에서 열기
+npm run open:worker
 ```
 
-### 3. 배포
+### 배포
 
 ```bash
-# Cloudflare Workers 배포
-cd workers
-npx wrangler deploy
+# 배포
+npm run deploy
+
+# 배포 히스토리 보기
+npm run deployments
 ```
 
-## 🏗️ 아키텍처
+## 사용 가능한 스크립트
 
-### 환경별 구현체
+| 스크립트              | 설명                            |
+| --------------------- | ------------------------------- |
+| `npm run dev:local`   | 로컬 개발 서버 시작             |
+| `npm run dev:remote`  | Cloudflare Workers로 개발       |
+| `npm run open:worker` | 배포된 워커를 브라우저에서 열기 |
+| `npm run deploy`      | 배포                            |
+| `npm run deployments` | 배포 히스토리 보기              |
+| `npm run check:types` | TypeScript 타입 체크            |
 
-| 환경                   | AI                | 스토리지    | 알림    |
-| ---------------------- | ----------------- | ----------- | ------- |
-| **Cloudflare Workers** | Workers AI        | R2          | Discord |
-| **로컬 개발**          | Workers AI (Mock) | File System | Discord |
+## API 엔드포인트
 
-### 핵심 컴포넌트
+- `GET /` - 웹 인터페이스
+- `GET /api/config` - 설정 정보 조회
+- `GET /api/links` - 링크 목록 조회
+- `POST /api/add-link` - 새 링크 추가
+- `POST /api/process-links` - 링크 처리
 
-```typescript
-// 애플리케이션 서비스 (TSyringe 자동 주입)
-@injectable()
-export class LinkManagementService {
-  constructor(
-    @inject(TOKENS.LinkRepository) linkRepository: LinkRepository,
-    @inject(TOKENS.ContentScraper) contentScraper: ContentScraper,
-    @inject(TOKENS.AISummarizer) aiSummarizer: AISummarizer,
-    @inject(TOKENS.Notifier) private discordNotifier: Notifier,
-    @inject(TOKENS.BackgroundTaskRunner)
-    private backgroundTaskRunner: BackgroundTaskRunner
-  ) {}
-}
-```
+## 아키텍처
 
-### DI 컨테이너 설정
+이 프로젝트는 다음을 사용합니다:
 
-```typescript
-// Cloudflare Workers
-await createCloudflareContainer(env, ctx);
-const service = container.resolve(LinkManagementService);
+- **TSyringe** - 의존성 주입
+- **Cloudflare Workers** - 서버리스 배포
+- **TypeScript** - 타입 안전성
+- **모듈형 아키텍처** - 유지보수성
 
-// 로컬 개발
-await createLocalContainer();
-const service = container.resolve(LinkManagementService);
-```
+## 기여하기
 
-## 📡 API 엔드포인트
+1. 저장소를 포크하세요
+2. 기능 브랜치를 생성하세요 (`git checkout -b feature/amazing-feature`)
+3. 변경사항을 커밋하세요 (`git commit -m 'Add some amazing feature'`)
+4. 브랜치에 푸시하세요 (`git push origin feature/amazing-feature`)
+5. Pull Request를 열어주세요
 
-### POST /api/add-link
+## 라이선스
 
-링크 추가
-
-```bash
-curl -X POST https://your-worker.workers.dev/api/add-link \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com", "tags": ["tech", "ai"]}'
-```
-
-### GET /api/links
-
-링크 목록 조회
-
-```bash
-curl https://your-worker.workers.dev/api/links
-```
-
-### POST /api/process-links
-
-미처리 링크 일괄 처리
-
-```bash
-curl -X POST https://your-worker.workers.dev/api/process-links
-```
-
-### GET /api/config
-
-현재 설정 조회
-
-```bash
-curl https://your-worker.workers.dev/api/config
-```
-
-## 🔧 개발
-
-### 타입 체크
-
-```bash
-npm run check:types
-```
-
-### 로컬 테스트
-
-```bash
-# 로컬 환경에서 서비스 테스트
-npm run dev
-```
-
-## 📁 프로젝트 구조
-
-```
-linkdump-bot/
-├── src/
-│   ├── shared/
-│   │   ├── interfaces/index.ts           # 인터페이스 & DI 토큰
-│   │   └── container/
-│   │       ├── service-registry.ts       # 공통 DI 로직
-│   │       ├── cloudflare-container.ts   # Workers 설정
-│   │       └── local-container.ts        # 로컬 설정
-│   └── link-management/
-│       ├── domain/                       # 비즈니스 로직
-│       ├── application/                  # 애플리케이션 서비스
-│       └── infrastructure/               # 외부 서비스 구현체
-├── workers/
-│   ├── app.ts                           # Workers 엔트리포인트
-│   └── wrangler.toml                    # Workers 설정
-└── package.json
-```
-
-## 🎯 핵심 특징
-
-### TSyringe 기반 DI
-
-- **표준 라이브러리**: Microsoft 공식 DI 컨테이너
-- **타입 안전성**: 완전한 TypeScript 지원
-- **데코레이터 기반**: `@injectable()`, `@inject()` 사용
-
-### 환경별 최적화
-
-- **Cloudflare Workers**: Workers AI + R2 스토리지로 서버리스 최적화
-- **로컬 개발**: Workers AI Mock + 파일 시스템으로 개발 편의성
-
-### Clean Architecture
-
-- **도메인 중심**: 비즈니스 로직과 인프라 분리
-- **의존성 역전**: 인터페이스 기반 설계
-- **테스트 용이성**: Mock 주입 간편
-
-## �� 라이선스
-
-MIT License
+이 프로젝트는 MIT 라이선스 하에 있습니다.

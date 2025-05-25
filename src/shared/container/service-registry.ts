@@ -9,7 +9,7 @@ export type ServiceDependencies = {
 
 export interface ServiceConfig {
   token: symbol;
-  import?: string;
+  importFn?: () => Promise<any>; // 문자열 대신 함수로 변경
   class?: string;
   factory: (deps: ServiceDependencies) => any;
 }
@@ -23,17 +23,17 @@ export async function loadDependencies(
   // 의존성 로드
   const imports = await Promise.all(
     serviceConfig
-      .filter((service) => service.import)
-      .map((service) => import(service.import!))
+      .filter((service) => service.importFn)
+      .map((service) => service.importFn!())
   );
 
   // 클래스 매핑
   const classes: Record<string, new (...args: any[]) => any> = {};
   serviceConfig.forEach((service, index) => {
-    if (service.class && service.import) {
+    if (service.class && service.importFn) {
       const importIndex = serviceConfig
         .slice(0, index)
-        .filter((s) => s.import).length;
+        .filter((s) => s.importFn).length;
       classes[service.class] = imports[importIndex][service.class];
     }
   });

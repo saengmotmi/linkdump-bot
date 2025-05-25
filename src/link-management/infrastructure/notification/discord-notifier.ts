@@ -44,9 +44,12 @@ export class DiscordNotifier implements Notifier {
    */
   private createEmbed(linkData: LinkData): DiscordEmbed {
     return {
-      title: this.truncateText(linkData.title || "No Title", 256),
+      title: this.truncateText(
+        this.generateMeaningfulTitle(linkData.title, linkData.url),
+        256
+      ),
       description: this.truncateText(
-        linkData.summary || "No Summary Available",
+        linkData.summary || "요약이 없습니다.",
         4096
       ),
       url: linkData.url,
@@ -71,6 +74,34 @@ export class DiscordNotifier implements Notifier {
         text: "LinkDump Bot",
       },
     };
+  }
+
+  /**
+   * 의미있는 타이틀 생성
+   */
+  private generateMeaningfulTitle(
+    title: string | undefined,
+    url: string
+  ): string {
+    if (title && title.trim()) {
+      return title.trim();
+    }
+
+    // URL에서 도메인명 추출
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+
+      // X(트위터) 특별 처리
+      if (hostname.includes("x.com") || hostname.includes("twitter.com")) {
+        return "트윗";
+      }
+
+      // 일반적인 도메인명 사용
+      return hostname.replace("www.", "");
+    } catch {
+      return "링크";
+    }
   }
 
   /**
