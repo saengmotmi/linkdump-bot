@@ -536,7 +536,7 @@ function getWebPage(url) {
             submitBtn.disabled = true;
             processBtn.disabled = true;
             loadingDiv.style.display = 'block';
-            loadingText.textContent = ${action} 중...;
+            loadingText.textContent = action + ' 중...';
             messageDiv.innerHTML = '';
             
             try {
@@ -557,16 +557,16 @@ function getWebPage(url) {
                 
                 if (response.ok) {
                     if (isManualProcess) {
-                        messageDiv.innerHTML = \`<div class="success">✅ ${result.message}</div>\`;
+                        messageDiv.innerHTML = '<div class="success">✅ ' + result.message + '</div>';
                     } else {
                         messageDiv.innerHTML = '<div class="success">✅ 링크가 저장되었습니다! 백그라운드에서 Workers AI가 무료 처리 중...</div>';
                         document.getElementById('linkForm').reset();
                     }
                 } else {
-                    messageDiv.innerHTML = \`<div class="error">❌ \${result.error || '오류가 발생했습니다'}</div>\`;
+                    messageDiv.innerHTML = '<div class="error">❌ ' + (result.error || '오류가 발생했습니다') + '</div>';
                 }
             } catch (error) {
-                messageDiv.innerHTML = \`<div class="error">❌ 네트워크 오류: \${error.message}</div>\`;
+                messageDiv.innerHTML = '<div class="error">❌ 네트워크 오류: ' + error.message + '</div>';
             } finally {
                 // UI 상태 복원
                 submitBtn.disabled = false;
