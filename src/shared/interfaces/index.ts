@@ -127,4 +127,9 @@ export const TOKENS = {
   // 도메인
   LinkRepository: Symbol.for("LinkRepository"),
   LinkManagementService: Symbol.for("LinkManagementService"),
+
+  // 추가 인프라 (일관성을 위해)
+  R2Bucket: Symbol.for("R2Bucket"),
+  FileStorage: Symbol.for("FileStorage"),
+  OpenAISummarizer: Symbol.for("OpenAISummarizer"),
 } as const;

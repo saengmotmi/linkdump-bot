@@ -1,5 +1,6 @@
 import { injectable, inject } from "tsyringe";
 import type { Storage } from "../../../shared/interfaces/index.js";
+import { TOKENS } from "../../../shared/interfaces/index.js";
 
 interface R2Object {
   key: string;
@@ -36,7 +37,7 @@ interface R2Bucket {
 export class R2Storage implements Storage {
   private bucket: R2Bucket;
 
-  constructor(@inject("R2_BUCKET") r2Bucket: R2Bucket) {
+  constructor(@inject(TOKENS.Storage) r2Bucket: R2Bucket) {
     this.bucket = r2Bucket;
   }
 

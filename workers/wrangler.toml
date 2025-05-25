@@ -1,6 +1,6 @@
 name = "linkdump-bot"
-main = "app.js"
-compatibility_date = "2024-01-15"
+main = "app.ts"
+compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 # R2 Bucket 바인딩

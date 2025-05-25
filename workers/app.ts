@@ -1,18 +1,16 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
-import { setupCloudflareContainer } from "../src/shared/container/cloudflare-container.js";
+import { createCloudflareContainer } from "../src/shared/container/cloudflare-container.js";
 import { LinkManagementService } from "../src/link-management/application/link-management-service.js";
-import { Runtime, TOKENS } from "../src/shared/interfaces/index.js";
 
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
     try {
       // TSyringe 컨테이너 설정
-      await setupCloudflareContainer(env, ctx);
+      await createCloudflareContainer(env, ctx);
 
       // 서비스 해결
       const linkManagementService = container.resolve(LinkManagementService);
-      const runtime = container.resolve<Runtime>(TOKENS.Runtime);
 
       const url = new URL(request.url);
       const method = request.method;
