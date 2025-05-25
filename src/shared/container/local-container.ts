@@ -2,7 +2,11 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import type { Config } from "../interfaces/index.js";
 import { TOKENS } from "../interfaces/index.js";
-import { setupContainer, type ServiceConfig } from "./service-registry.js";
+import {
+  setupContainer,
+  type ServiceConfig,
+  type ServiceDependencies,
+} from "./service-registry.js";
 
 /**
  * 로컬 개발 환경 서비스 설정 정의
@@ -27,7 +31,7 @@ function createLocalServiceConfig(
       import: "../../link-management/infrastructure/storage/file-storage.js",
       class: "FileStorage",
       factory: (deps: ServiceDependencies) => {
-        const config = deps.resolve(TOKENS.Config);
+        const config = deps.resolve<Config>(TOKENS.Config);
         return new deps.FileStorage(config.dataPath || "./data");
       },
     },
@@ -35,8 +39,9 @@ function createLocalServiceConfig(
       token: TOKENS.LinkRepository,
       import: "../../link-management/infrastructure/storage-link-repository.js",
       class: "StorageLinkRepository",
-      factory: (deps: ServiceDependencies) =>
-        new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage)),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
+      },
     },
     {
       token: TOKENS.AIClient,
@@ -58,15 +63,18 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js",
       class: "WorkersAISummarizer",
-      factory: (deps: ServiceDependencies) =>
-        new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient)),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
+      },
     },
     {
       token: TOKENS.ContentScraper,
       import:
         "../../link-management/infrastructure/content-scraper/web-scraper.js",
       class: "WebContentScraper",
-      factory: (deps: ServiceDependencies) => new deps.WebContentScraper(),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WebContentScraper();
+      },
     },
     {
       token: TOKENS.Notifier,
@@ -74,7 +82,7 @@ function createLocalServiceConfig(
         "../../link-management/infrastructure/notification/discord-notifier.js",
       class: "DiscordNotifier",
       factory: (deps: ServiceDependencies) => {
-        const config = deps.resolve(TOKENS.Config);
+        const config = deps.resolve<Config>(TOKENS.Config);
         return new deps.DiscordNotifier(config.webhookUrls || []);
       },
     },
@@ -83,7 +91,9 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/background-task/local-background-runner.js",
       class: "LocalBackgroundRunner",
-      factory: (deps: ServiceDependencies) => new deps.LocalBackgroundRunner(),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.LocalBackgroundRunner();
+      },
     },
   ];
 }
@@ -114,10 +124,4 @@ export async function createLocalContainer(config: Partial<Config> = {}) {
   await setupLocalContainer(config);
 
   return childContainer;
-}
-
-// 서비스 의존성 타입 정의
-interface ServiceDependencies {
-  resolve: (token: symbol) => unknown;
-  [key: string]: unknown;
 }

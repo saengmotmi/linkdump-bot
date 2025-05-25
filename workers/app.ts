@@ -71,13 +71,15 @@ export default {
       }
 
       return new Response("Method Not Allowed", { status: 405 });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Worker error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
       return new Response(
         JSON.stringify({
           success: false,
           error: "Internal Server Error",
-          details: error.message,
+          details: errorMessage,
         }),
         {
           status: 500,
@@ -114,9 +116,11 @@ async function handleAddLink(
       status: result.success ? 200 : 400,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -135,9 +139,11 @@ async function handleProcessLinks(
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -156,9 +162,11 @@ async function handleGetLinks(
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -167,7 +175,7 @@ async function handleGetLinks(
 /**
  * 설정 조회 핸들러 - 실제 컨테이너 설정을 동적으로 조회
  */
-async function handleGetConfig(env: any): Promise<Response> {
+async function handleGetConfig(env: Env): Promise<Response> {
   try {
     // 실제 컨테이너에서 설정 조회
     const config = container.resolve<Config>(TOKENS.Config);
@@ -183,10 +191,14 @@ async function handleGetConfig(env: any): Promise<Response> {
       architecture: "TSyringe-based Dependency Injection",
       environment: env.CF_PAGES ? "Cloudflare Pages" : "Cloudflare Workers",
       services: {
-        ai: (aiClient as any).constructor.name,
-        storage: (storage as any).constructor.name,
-        notifications: (notifier as any).constructor.name,
-        backgroundTasks: (backgroundTaskRunner as any).constructor.name,
+        ai: (aiClient as { constructor: { name: string } }).constructor.name,
+        storage: (storage as { constructor: { name: string } }).constructor
+          .name,
+        notifications: (notifier as { constructor: { name: string } })
+          .constructor.name,
+        backgroundTasks: (
+          backgroundTaskRunner as { constructor: { name: string } }
+        ).constructor.name,
       },
     };
 
@@ -197,9 +209,11 @@ async function handleGetConfig(env: any): Promise<Response> {
         headers: { "Content-Type": "application/json" },
       }
     );
-  } catch (error: any) {
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
+      JSON.stringify({ success: false, error: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
