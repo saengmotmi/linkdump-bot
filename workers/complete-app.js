@@ -1,17 +1,29 @@
 // 완전 통합 Cloudflare Worker: 웹페이지 + API + 링크 처리
+import {
+  validateUrl,
+  createLinkData,
+  isDuplicateLink,
+  extractOGTags,
+  generateAIPrompt,
+  parseWorkersAIResponse,
+  createDiscordEmbed,
+  parseWebhookUrls,
+  getUnprocessedLinks,
+  markLinkAsProcessed,
+} from "../src/business-logic.js";
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    
+
     // CORS 헤더
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     };
 
     // OPTIONS 요청 처리
-    if (request.method === 'OPTIONS') {
+    if (request.method === "OPTIONS") {
       return new Response(null, {
         status: 200,
         headers: corsHeaders,
@@ -19,26 +31,26 @@ export default {
     }
 
     // API 경로 처리
-    if (url.pathname === '/api/add-link' && request.method === 'POST') {
+    if (url.pathname === "/api/add-link" && request.method === "POST") {
       return handleAddLink(request, env, ctx, corsHeaders);
     }
 
     // 수동 처리 트리거 API
-    if (url.pathname === '/api/process-links' && request.method === 'POST') {
+    if (url.pathname === "/api/process-links" && request.method === "POST") {
       return handleProcessLinks(request, env, ctx, corsHeaders);
     }
 
     // 웹페이지 제공 (GET 요청)
-    if (request.method === 'GET') {
+    if (request.method === "GET") {
       return new Response(getWebPage(url), {
         headers: {
-          'Content-Type': 'text/html;charset=UTF-8',
+          "Content-Type": "text/html;charset=UTF-8",
           ...corsHeaders,
         },
       });
     }
 
-    return new Response('Not Found', { status: 404 });
+    return new Response("Not Found", { status: 404 });
   },
 };
 
@@ -47,15 +59,17 @@ async function handleAddLink(request, env, ctx, corsHeaders) {
   try {
     const { url, tags = [] } = await request.json();
 
-    if (!url) {
-      return new Response(JSON.stringify({ error: 'URL is required' }), {
+    // URL 유효성 검증
+    const validation = validateUrl(url);
+    if (!validation.valid) {
+      return new Response(JSON.stringify({ error: validation.error }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // R2에서 현재 링크 데이터 가져오기
-    const object = await env.LINKDUMP_STORAGE.get('links.json');
+    const object = await env.LINKDUMP_STORAGE.get("links.json");
     let linksData = { links: [] };
 
     if (object) {
@@ -64,54 +78,56 @@ async function handleAddLink(request, env, ctx, corsHeaders) {
     }
 
     // 중복 체크
-    const exists = linksData.links.some(link => link.url === url);
-    if (exists) {
-      return new Response(JSON.stringify({ error: 'Link already exists' }), {
+    if (isDuplicateLink(url, linksData.links)) {
+      return new Response(JSON.stringify({ error: "Link already exists" }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     // 새 링크 추가
-    const newLink = {
-      id: Date.now().toString(),
-      url: url,
-      tags: tags,
-      addedAt: new Date().toISOString(),
-      processed: false
-    };
+    const newLink = createLinkData(url, tags);
 
     linksData.links.push(newLink);
 
     // R2에 업데이트된 데이터 저장
-    await env.LINKDUMP_STORAGE.put('links.json', JSON.stringify(linksData, null, 2), {
-      metadata: {
-        lastModified: new Date().toISOString(),
-        addedBy: 'web-interface'
+    await env.LINKDUMP_STORAGE.put(
+      "links.json",
+      JSON.stringify(linksData, null, 2),
+      {
+        metadata: {
+          lastModified: new Date().toISOString(),
+          addedBy: "web-interface",
+        },
       }
-    });
+    );
 
     // 백그라운드에서 링크 처리 시작 (즉시 반환하고 백그라운드에서 실행)
     ctx.waitUntil(processNewLinksBackground(env, newLink));
 
-    return new Response(JSON.stringify({
-      success: true,
-      message: 'Link added successfully',
-      link: newLink
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Link added successfully",
+        link: newLink,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
-    console.error('Error adding link:', error);
-    return new Response(JSON.stringify({
-      error: 'Failed to add link',
-      details: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Error adding link:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to add link",
+        details: error.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 }
 
@@ -119,107 +135,119 @@ async function handleAddLink(request, env, ctx, corsHeaders) {
 async function handleProcessLinks(request, env, ctx, corsHeaders) {
   try {
     const result = await processAllUnprocessedLinks(env);
-    
-    return new Response(JSON.stringify({
-      success: true,
-      message: \`Processed \${result.processedCount} links\`,
-      details: result
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-    
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: `Processed ${result.processedCount} links`,
+        details: result,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   } catch (error) {
-    console.error('Error processing links:', error);
-    return new Response(JSON.stringify({
-      error: 'Failed to process links',
-      details: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error("Error processing links:", error);
+    return new Response(
+      JSON.stringify({
+        error: "Failed to process links",
+        details: error.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 }
 
 // 백그라운드 링크 처리 (단일 링크)
 async function processNewLinksBackground(env, newLink) {
   try {
-    console.log(\`Background processing: \${newLink.url}\`);
-    
+    console.log(`Background processing: ${newLink.url}`);
+
     // OG 태그 스크래핑
     const ogData = await scrapeOGTags(newLink.url);
     if (!ogData) {
-      console.error(\`Failed to scrape OG tags for: \${newLink.url}\`);
+      console.error(`Failed to scrape OG tags for: ${newLink.url}`);
       return;
     }
-    
+
     // AI 요약 생성
     const summary = await generateSummary(env, ogData, newLink.url);
-    
+
     // R2에서 현재 데이터 가져오기
-    const object = await env.LINKDUMP_STORAGE.get('links.json');
+    const object = await env.LINKDUMP_STORAGE.get("links.json");
     if (!object) return;
-    
+
     const linksData = JSON.parse(await object.text());
-    
+
     // 해당 링크 업데이트
-    const linkIndex = linksData.links.findIndex(link => link.id === newLink.id);
+    const linkIndex = linksData.links.findIndex(
+      (link) => link.id === newLink.id
+    );
     if (linkIndex !== -1) {
-      linksData.links[linkIndex].ogData = ogData;
-      linksData.links[linkIndex].summary = summary;
-      linksData.links[linkIndex].processed = true;
-      linksData.links[linkIndex].processedAt = new Date().toISOString();
-      
+      const updatedLink = markLinkAsProcessed(
+        linksData.links[linkIndex],
+        ogData,
+        summary
+      );
+      linksData.links[linkIndex] = updatedLink;
+
       // R2에 업데이트된 데이터 저장
-      await env.LINKDUMP_STORAGE.put('links.json', JSON.stringify(linksData, null, 2));
-      
+      await env.LINKDUMP_STORAGE.put(
+        "links.json",
+        JSON.stringify(linksData, null, 2)
+      );
+
       // Discord로 전송
       await sendToDiscord(env, linksData.links[linkIndex]);
     }
-    
   } catch (error) {
-    console.error('Background processing error:', error);
+    console.error("Background processing error:", error);
   }
 }
 
 // 모든 미처리 링크 처리
 async function processAllUnprocessedLinks(env) {
-  const object = await env.LINKDUMP_STORAGE.get('links.json');
+  const object = await env.LINKDUMP_STORAGE.get("links.json");
   if (!object) return { processedCount: 0 };
-  
+
   const linksData = JSON.parse(await object.text());
-  const unprocessedLinks = linksData.links.filter(link => !link.processed);
-  
+  const unprocessedLinks = getUnprocessedLinks(linksData);
+
   let processedCount = 0;
-  
+
   for (const link of unprocessedLinks) {
     try {
-      console.log(\`Processing: \${link.url}\`);
-      
+      console.log(`Processing: ${link.url}`);
+
       const ogData = await scrapeOGTags(link.url);
       if (!ogData) continue;
-      
+
       const summary = await generateSummary(env, ogData, link.url);
-      
-      link.ogData = ogData;
-      link.summary = summary;
-      link.processed = true;
-      link.processedAt = new Date().toISOString();
-      
+
+      // 링크를 처리 완료로 표시
+      const updatedLink = markLinkAsProcessed(link, ogData, summary);
+      Object.assign(link, updatedLink);
+
       await sendToDiscord(env, link);
       processedCount++;
-      
+
       // 요청 제한 방지
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (error) {
-      console.error(\`Failed to process \${link.url}:\`, error);
+      console.error(`Failed to process ${link.url}:`, error);
     }
   }
-  
+
   // 업데이트된 데이터 저장
-  await env.LINKDUMP_STORAGE.put('links.json', JSON.stringify(linksData, null, 2));
-  
+  await env.LINKDUMP_STORAGE.put(
+    "links.json",
+    JSON.stringify(linksData, null, 2)
+  );
+
   return { processedCount, totalLinks: linksData.links.length };
 }
 
@@ -228,41 +256,19 @@ async function scrapeOGTags(url) {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
     });
-    
+
     if (!response.ok) return null;
-    
+
     const html = await response.text();
-    
-    // 간단한 정규식으로 OG 태그 추출
-    const getMetaContent = (property) => {
-      const regex = new RegExp(\`<meta[^>]*property=["']\${property}["'][^>]*content=["']([^"']*)\`, 'i');
-      const match = html.match(regex);
-      return match ? match[1] : '';
-    };
-    
-    const getMetaName = (name) => {
-      const regex = new RegExp(\`<meta[^>]*name=["']\${name}["'][^>]*content=["']([^"']*)\`, 'i');
-      const match = html.match(regex);
-      return match ? match[1] : '';
-    };
-    
-    const getTitleContent = () => {
-      const match = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-      return match ? match[1] : '';
-    };
-    
-    return {
-      title: getMetaContent('og:title') || getTitleContent() || '',
-      description: getMetaContent('og:description') || getMetaName('description') || '',
-      image: getMetaContent('og:image') || '',
-      site_name: getMetaContent('og:site_name') || ''
-    };
-    
+
+    // business-logic.js의 extractOGTags 함수 사용
+    return extractOGTags(html);
   } catch (error) {
-    console.error(\`Failed to scrape \${url}:\`, error);
+    console.error(`Failed to scrape ${url}:`, error);
     return null;
   }
 }
@@ -270,65 +276,45 @@ async function scrapeOGTags(url) {
 // AI 요약 생성 (Cloudflare Workers AI - 완전 무료!)
 async function generateSummary(env, ogData, url) {
   try {
-    const prompt = \`Create an engaging 3-line summary in Korean explaining "why someone should click this link". Focus on the value and benefits to the reader.
+    const prompt = generateAIPrompt(ogData, url);
 
-Website Information:
-Title: \${ogData.title}
-Description: \${ogData.description}
-Site: \${ogData.site_name}
-URL: \${url}
-
-Write a compelling summary in Korean that motivates clicking:\`;
-
-    const response = await env.AI.run('@cf/meta/llama-3.2-1b-instruct', {
+    const response = await env.AI.run("@cf/meta/llama-3.2-1b-instruct", {
       messages: [
         {
-          role: 'user',
-          content: prompt
-        }
+          role: "user",
+          content: prompt,
+        },
       ],
-      max_tokens: 150
+      max_tokens: 150,
     });
 
-    // Workers AI 응답 형식에 맞게 처리
-    const summary = response.response || response.result || 'AI 요약을 생성할 수 없습니다.';
-    return summary.trim();
-    
+    // Workers AI 응답 파싱
+    return parseWorkersAIResponse(response, ogData);
   } catch (error) {
-    console.error('Failed to generate summary with Workers AI:', error);
+    console.error("Failed to generate summary with Workers AI:", error);
     // 폴백: 기본 한국어 요약
-    return \`🔗 \${ogData.title}\\n📝 \${ogData.description}\\n🎯 자세한 내용을 확인해보세요!\`;
+    return `🔗 ${ogData.title}\n📝 ${ogData.description}\n🎯 자세한 내용을 확인해보세요!`;
   }
 }
 
 // Discord 전송
 async function sendToDiscord(env, linkData) {
   if (!env.DISCORD_WEBHOOKS) return;
-  
-  const webhooks = env.DISCORD_WEBHOOKS.split(',').map(w => w.trim());
-  
-  const embed = {
-    title: linkData.ogData.title || 'New Link',
-    description: linkData.summary,
-    url: linkData.url,
-    color: 0x0099ff,
-    timestamp: new Date().toISOString()
-  };
 
-  if (linkData.ogData.image) {
-    embed.thumbnail = { url: linkData.ogData.image };
-  }
+  const webhooks = parseWebhookUrls(env.DISCORD_WEBHOOKS);
+
+  const payload = createDiscordEmbed(linkData);
 
   for (const webhook of webhooks) {
     try {
       await fetch(webhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ embeds: [embed] })
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-      console.log(\`Sent to Discord: \${linkData.url}\`);
+      console.log(`Sent to Discord: ${linkData.url}`);
     } catch (error) {
-      console.error('Failed to send to Discord:', error);
+      console.error("Failed to send to Discord:", error);
     }
   }
 }
@@ -336,8 +322,8 @@ async function sendToDiscord(env, linkData) {
 // 웹페이지 HTML 생성
 function getWebPage(url) {
   const workerUrl = url.origin;
-  
-  return \`<!DOCTYPE html>
+
+  return `<!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -513,7 +499,7 @@ function getWebPage(url) {
         <div class="bookmarklet">
             <strong>📱 북마클릿 (모바일에서 편리하게):</strong><br>
             아래 링크를 북마크에 추가하면 어떤 페이지에서든 바로 링크를 추가할 수 있습니다.<br>
-            <a href="javascript:(function(){var url=window.location.href;var title=document.title;window.open('\${workerUrl}?url='+encodeURIComponent(url)+'&title='+encodeURIComponent(title),'_blank','width=500,height=400');})();">
+            <a href="javascript:(function(){var url=window.location.href;var title=document.title;window.open('${workerUrl}?url='+encodeURIComponent(url)+'&title='+encodeURIComponent(title),'_blank','width=500,height=400');})();">
                 📲 링크덤프 추가
             </a>
         </div>
@@ -550,7 +536,7 @@ function getWebPage(url) {
             submitBtn.disabled = true;
             processBtn.disabled = true;
             loadingDiv.style.display = 'block';
-            loadingText.textContent = \`\${action} 중...\`;
+            loadingText.textContent = ${action} 중...;
             messageDiv.innerHTML = '';
             
             try {
@@ -571,7 +557,7 @@ function getWebPage(url) {
                 
                 if (response.ok) {
                     if (isManualProcess) {
-                        messageDiv.innerHTML = \`<div class="success">✅ \${result.message}</div>\`;
+                        messageDiv.innerHTML = \`<div class="success">✅ ${result.message}</div>\`;
                     } else {
                         messageDiv.innerHTML = '<div class="success">✅ 링크가 저장되었습니다! 백그라운드에서 Workers AI가 무료 처리 중...</div>';
                         document.getElementById('linkForm').reset();
@@ -590,5 +576,5 @@ function getWebPage(url) {
         }
     </script>
 </body>
-</html>\`;
+</html>`;
 }
