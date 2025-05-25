@@ -3,6 +3,7 @@ import { LinkController } from "./controllers/link-controller.js";
 import { ConfigController } from "./controllers/config-controller.js";
 import { PreviewController } from "./controllers/preview-controller.js";
 import { TOKENS, type CloudflareEnv } from "../../shared/interfaces/index.js";
+import { ApiErrorHandler, NotFoundError } from "./middleware/error-handler.js";
 
 /**
  * API 라우터
@@ -27,71 +28,74 @@ export class ApiRouter {
     const method = request.method;
     const pathname = url.pathname;
 
-    // CORS 헤더 설정
-    const corsHeaders = {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-    };
-
-    // OPTIONS 요청 처리
+    // OPTIONS 요청 처리 (CORS preflight)
     if (method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
-    }
-
-    let response: Response;
-
-    try {
-      // 라우팅
-      if (pathname === "/api/add-link" && method === "POST") {
-        response = await this.linkController.addLink(request);
-      } else if (pathname === "/api/process-links" && method === "POST") {
-        response = await this.linkController.processLinks();
-      } else if (pathname === "/api/links" && method === "GET") {
-        response = await this.linkController.getLinks();
-      } else if (pathname === "/api/config" && method === "GET") {
-        response = await this.configController.getConfig(env);
-      } else if (pathname === "/api/preview" && method === "POST") {
-        response = await this.previewController.getPreview(request);
-      } else {
-        response = new Response(
-          JSON.stringify({ success: false, error: "Not Found" }),
-          {
-            status: 404,
-            headers: { "Content-Type": "application/json" },
-          }
-        );
-      }
-
-      // CORS 헤더 추가
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        response.headers.set(key, value);
-      });
-
-      return response;
-    } catch (error) {
-      console.error("API Router error:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-
-      const errorResponse = new Response(
-        JSON.stringify({
-          success: false,
-          error: "Internal Server Error",
-          details: errorMessage,
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        }
+      return ApiErrorHandler.addCorsHeaders(
+        new Response(null, { status: 200 })
       );
-
-      // CORS 헤더 추가
-      Object.entries(corsHeaders).forEach(([key, value]) => {
-        errorResponse.headers.set(key, value);
-      });
-
-      return errorResponse;
     }
+
+    // 라우팅 및 에러 처리
+    const result = await ApiErrorHandler.wrapAsync(async () => {
+      return await this.routeRequest(pathname, method, request, env);
+    }, `${method} ${pathname}`);
+
+    // 결과가 Response인 경우 (에러 처리된 경우)
+    if (result instanceof Response) {
+      return ApiErrorHandler.addCorsHeaders(result);
+    }
+
+    // 정상 응답에 CORS 헤더 추가
+    return ApiErrorHandler.addCorsHeaders(result as Response);
+  }
+
+  /**
+   * 요청을 적절한 컨트롤러로 라우팅합니다.
+   */
+  private async routeRequest(
+    pathname: string,
+    method: string,
+    request: Request,
+    env: CloudflareEnv
+  ): Promise<Response> {
+    // 라우팅 테이블
+    const routes = [
+      {
+        path: "/api/add-link",
+        method: "POST",
+        handler: () => this.linkController.addLink(request),
+      },
+      {
+        path: "/api/process-links",
+        method: "POST",
+        handler: () => this.linkController.processLinks(),
+      },
+      {
+        path: "/api/links",
+        method: "GET",
+        handler: () => this.linkController.getLinks(),
+      },
+      {
+        path: "/api/config",
+        method: "GET",
+        handler: () => this.configController.getConfig(env),
+      },
+      {
+        path: "/api/preview",
+        method: "POST",
+        handler: () => this.previewController.getPreview(request),
+      },
+    ];
+
+    // 매칭되는 라우트 찾기
+    const route = routes.find(
+      (r) => r.path === pathname && r.method === method
+    );
+
+    if (!route) {
+      throw new NotFoundError(`Endpoint ${method} ${pathname} not found`);
+    }
+
+    return await route.handler();
   }
 }

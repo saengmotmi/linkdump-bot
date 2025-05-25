@@ -4,6 +4,7 @@ import {
   type Config,
   type CloudflareEnv,
 } from "../../../shared/interfaces/index.js";
+import { ApiErrorHandler } from "../middleware/error-handler.js";
 
 /**
  * 설정 관련 API 컨트롤러
@@ -14,7 +15,7 @@ export class ConfigController {
    * 설정 조회 API - 실제 컨테이너 설정을 동적으로 조회
    */
   async getConfig(env: CloudflareEnv): Promise<Response> {
-    try {
+    const result = await ApiErrorHandler.wrapAsync(async () => {
       // 실제 컨테이너에서 설정 조회
       const config = container.resolve<Config>(TOKENS.Config);
 
@@ -49,13 +50,8 @@ export class ConfigController {
           headers: { "Content-Type": "application/json" },
         }
       );
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error";
-      return new Response(
-        JSON.stringify({ success: false, error: errorMessage }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    }, "ConfigController.getConfig");
+
+    return result as Response;
   }
 }
