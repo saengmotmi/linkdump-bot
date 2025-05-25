@@ -2,6 +2,69 @@
 
 TypeScript와 TSyringe 의존성 주입, Cloudflare Workers를 사용한 강력한 링크 관리 봇입니다.
 
+## 📁 프로젝트 구조
+
+```
+linkdump-bot/
+├── 🚀 workers/app.ts              # ⭐ 메인 진입점 (Cloudflare Workers)
+│   └── wrangler.toml              # Cloudflare Workers 설정
+│
+├── src/
+│   ├── shared/
+│   │   ├── interfaces/            # 인터페이스 정의
+│   │   └── container/
+│   │       └── service-registry.ts  # 공통 서비스 등록 로직
+│   │
+│   └── link-management/           # 📦 링크 관리 도메인
+│       ├── 🏭 di/                 # ⭐ 의존성 주입 설정 (핵심!)
+│       │   ├── cloudflare-container.ts  # 프로덕션 환경 (app.ts에서 사용)
+│       │   └── local-container.ts       # 로컬 개발 환경
+│       ├── application/           # 애플리케이션 서비스
+│       ├── domain/               # 도메인 로직
+│       └── infrastructure/       # 외부 서비스 구현체
+│
+├── package.json                   # 프로젝트 설정 & 스크립트
+└── .env.example                   # 환경 변수 예시
+```
+
+### 🔄 실행 흐름 (Execution Flow)
+
+```
+1. workers/app.ts (진입점)
+   ↓
+2. src/link-management/di/cloudflare-container.ts (의존성 설정)
+   ↓
+3. src/link-management/application/ (비즈니스 로직 실행)
+   ↓
+4. src/link-management/infrastructure/ (외부 서비스 호출)
+```
+
+### 🎯 핵심 파일들
+
+| 파일                                                         | 역할                                | 중요도 |
+| ------------------------------------------------------------ | ----------------------------------- | ------ |
+| `workers/app.ts`                                             | 🚀 **메인 진입점** - HTTP 요청 처리 | ⭐⭐⭐ |
+| `src/link-management/di/cloudflare-container.ts`             | 🏭 **의존성 설정** - 서비스 연결    | ⭐⭐⭐ |
+| `src/link-management/application/link-management-service.ts` | 📋 **비즈니스 로직**                | ⭐⭐   |
+| `src/link-management/di/local-container.ts`                  | 🛠️ 로컬 개발용 설정                 | ⭐     |
+
+### 👀 코드를 처음 보는 사람을 위한 가이드
+
+**"어디서 시작해야 할지 모르겠다면?"**
+
+1. **`workers/app.ts`** 부터 보세요 - 모든 것이 여기서 시작됩니다
+2. **`src/link-management/di/cloudflare-container.ts`** - app.ts에서 호출하는 핵심 설정 파일
+3. **`src/link-management/application/link-management-service.ts`** - 실제 비즈니스 로직
+
+**"실제로 뭘 하는 앱인지 알고 싶다면?"**
+
+- 브라우저에서 `npm run dev:local` 후 `http://localhost:8787` 접속
+- 링크를 입력하면 AI가 요약해서 Discord로 전송하는 앱입니다
+
+**"배포는 어떻게?"**
+
+- `npm run deploy` 한 번이면 Cloudflare Workers에 배포 완료
+
 ## ✨ 주요 기능
 
 - 🔗 링크 수집 및 관리

@@ -1,12 +1,29 @@
+/**
+ * 🏭 Cloudflare Workers 환경 의존성 주입 컨테이너
+ *
+ * ⭐ 핵심 파일! workers/app.ts에서 호출되어 전체 앱의 서비스들을 설정합니다.
+ *
+ * 실행 흐름:
+ * workers/app.ts → createCloudflareContainer() → 모든 서비스 설정 완료
+ *
+ * 프로덕션 환경(Cloudflare Workers)에서 사용되는 서비스들을 설정합니다:
+ * - R2 Storage (클라우드 스토리지)
+ * - Workers AI (AI 서비스)
+ * - Discord Notifier (웹훅 알림)
+ * - Background Task Runner (백그라운드 작업)
+ *
+ * 사용처: workers/app.ts에서 import하여 사용
+ */
+
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type { Config } from "../interfaces/index.js";
-import { TOKENS } from "../interfaces/index.js";
+import type { Config } from "../../shared/interfaces/index.js";
+import { TOKENS } from "../../shared/interfaces/index.js";
 import {
   setupContainer,
   type ServiceConfig,
   type ServiceDependencies,
-} from "./service-registry.js";
+} from "../../shared/container/service-registry.js";
 
 // Cloudflare Workers 환경 타입 정의
 interface CloudflareEnv {
@@ -37,8 +54,7 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.Storage,
-      importFn: () =>
-        import("../../link-management/infrastructure/storage/r2-storage.js"),
+      importFn: () => import("../infrastructure/storage/r2-storage.js"),
       class: "R2Storage",
       factory: (deps: ServiceDependencies) => {
         return new deps.R2Storage(env.LINKDUMP_STORAGE);
@@ -46,10 +62,7 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.LinkRepository,
-      importFn: () =>
-        import(
-          "../../link-management/infrastructure/storage-link-repository.js"
-        ),
+      importFn: () => import("../infrastructure/storage-link-repository.js"),
       class: "StorageLinkRepository",
       factory: (deps: ServiceDependencies) => {
         return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
@@ -58,9 +71,7 @@ function createCloudflareServiceConfig(
     {
       token: TOKENS.AIClient,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/ai-provider/workers-ai-client.js"
-        ),
+        import("../infrastructure/ai-provider/workers-ai-client.js"),
       class: "WorkersAIClient",
       factory: (deps: ServiceDependencies) => {
         return new deps.WorkersAIClient(env.AI);
@@ -69,9 +80,7 @@ function createCloudflareServiceConfig(
     {
       token: TOKENS.AISummarizer,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js"
-        ),
+        import("../infrastructure/ai-summarizer/workers-ai-summarizer.js"),
       class: "WorkersAISummarizer",
       factory: (deps: ServiceDependencies) => {
         return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
@@ -80,9 +89,7 @@ function createCloudflareServiceConfig(
     {
       token: TOKENS.ContentScraper,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/content-scraper/web-scraper.js"
-        ),
+        import("../infrastructure/content-scraper/web-scraper.js"),
       class: "WebContentScraper",
       factory: (deps: ServiceDependencies) => {
         return new deps.WebContentScraper();
@@ -91,9 +98,7 @@ function createCloudflareServiceConfig(
     {
       token: TOKENS.Notifier,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/notification/discord-notifier.js"
-        ),
+        import("../infrastructure/notification/discord-notifier.js"),
       class: "DiscordNotifier",
       factory: (deps: ServiceDependencies) => {
         const config = deps.resolve<Config>(TOKENS.Config);
@@ -104,7 +109,7 @@ function createCloudflareServiceConfig(
       token: TOKENS.BackgroundTaskRunner,
       importFn: () =>
         import(
-          "../../link-management/infrastructure/background-task/workers-background-runner.js"
+          "../infrastructure/background-task/workers-background-runner.js"
         ),
       class: "WorkersBackgroundRunner",
       factory: (deps: ServiceDependencies) => {
