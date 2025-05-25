@@ -1,8 +1,28 @@
+import { injectable, inject } from "tsyringe";
+import type { AIClient, AIOptions } from "../../../shared/interfaces/index.js";
+
+interface WorkersAIMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+interface WorkersAIResponse {
+  response?: string;
+  result?: string;
+}
+
 /**
  * Cloudflare Workers AI 클라이언트
  */
-export class WorkersAIClient {
-  constructor(aiBinding, defaultModel = "@cf/meta/llama-3.2-1b-instruct") {
+@injectable()
+export class WorkersAIClient implements AIClient {
+  private ai: any; // Cloudflare AI binding
+  private defaultModel: string;
+
+  constructor(
+    @inject("AI_BINDING") aiBinding: any,
+    defaultModel: string = "@cf/meta/llama-3.2-1b-instruct"
+  ) {
     this.ai = aiBinding;
     this.defaultModel = defaultModel;
   }
@@ -10,7 +30,7 @@ export class WorkersAIClient {
   /**
    * 텍스트 생성
    */
-  async generateText(prompt, options = {}) {
+  async generateText(prompt: string, options: AIOptions = {}): Promise<string> {
     const {
       maxTokens = 150,
       temperature = 0.7,
@@ -25,7 +45,7 @@ export class WorkersAIClient {
       });
 
       return this._parseResponse(response);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Workers AI 생성 실패: ${error.message}`);
     }
   }
@@ -33,7 +53,10 @@ export class WorkersAIClient {
   /**
    * 채팅 완성
    */
-  async chatCompletion(messages, options = {}) {
+  async chatCompletion(
+    messages: WorkersAIMessage[],
+    options: AIOptions = {}
+  ): Promise<string> {
     const {
       maxTokens = 150,
       temperature = 0.7,
@@ -48,7 +71,7 @@ export class WorkersAIClient {
       });
 
       return this._parseResponse(response);
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`Workers AI 채팅 완성 실패: ${error.message}`);
     }
   }
@@ -56,7 +79,7 @@ export class WorkersAIClient {
   /**
    * 응답 파싱
    */
-  _parseResponse(response) {
+  private _parseResponse(response: WorkersAIResponse): string {
     if (!response) {
       throw new Error("Workers AI에서 빈 응답을 받았습니다");
     }

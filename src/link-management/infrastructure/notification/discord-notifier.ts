@@ -1,8 +1,40 @@
+import { injectable, inject } from "tsyringe";
+import type { Notifier, LinkData } from "../../../shared/interfaces/index.js";
+
+interface DiscordEmbed {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: number;
+  fields?: Array<{
+    name: string;
+    value: string;
+    inline?: boolean;
+  }>;
+  timestamp?: Date | string;
+  footer?: {
+    text: string;
+  };
+  image?: {
+    url: string;
+  };
+  thumbnail?: {
+    url: string;
+  };
+}
+
+interface DiscordPayload {
+  embeds: DiscordEmbed[];
+}
+
 /**
  * Discord 웹훅 기반 알림 구현체
  */
-export class DiscordNotifier {
-  constructor(webhookUrls = []) {
+@injectable()
+export class DiscordNotifier implements Notifier {
+  private webhookUrls: string[];
+
+  constructor(@inject("DISCORD_WEBHOOKS") webhookUrls: string[] = []) {
     this.webhookUrls = Array.isArray(webhookUrls)
       ? webhookUrls
       : [webhookUrls].filter(Boolean);
@@ -11,14 +43,14 @@ export class DiscordNotifier {
   /**
    * Discord로 링크 정보 전송
    */
-  async send(linkData) {
+  async send(linkData: LinkData): Promise<void> {
     if (this.webhookUrls.length === 0) {
       console.warn("Discord 웹훅이 설정되지 않았습니다.");
       return;
     }
 
     const embed = this.createEmbed(linkData);
-    const payload = { embeds: [embed] };
+    const payload: DiscordPayload = { embeds: [embed] };
 
     const results = await Promise.allSettled(
       this.webhookUrls.map((webhook) => this.sendToWebhook(webhook, payload))
@@ -36,7 +68,7 @@ export class DiscordNotifier {
   /**
    * Discord Embed 생성
    */
-  createEmbed(linkData) {
+  private createEmbed(linkData: LinkData): DiscordEmbed {
     return {
       title: this.truncateText(linkData.title || "No Title", 256),
       description: this.truncateText(
@@ -48,7 +80,10 @@ export class DiscordNotifier {
       fields: [
         {
           name: "🏷️ 태그",
-          value: linkData.tags.length > 0 ? linkData.tags.join(", ") : "없음",
+          value:
+            linkData.tags && linkData.tags.length > 0
+              ? linkData.tags.join(", ")
+              : "없음",
           inline: true,
         },
         {
@@ -61,17 +96,16 @@ export class DiscordNotifier {
       footer: {
         text: "LinkDump Bot",
       },
-      ...(linkData.image && {
-        image: { url: linkData.image },
-        thumbnail: { url: linkData.image },
-      }),
     };
   }
 
   /**
    * 웹훅으로 메시지 전송
    */
-  async sendToWebhook(webhookUrl, payload) {
+  private async sendToWebhook(
+    webhookUrl: string,
+    payload: DiscordPayload
+  ): Promise<Response> {
     const response = await fetch(webhookUrl, {
       method: "POST",
       headers: {
@@ -92,9 +126,9 @@ export class DiscordNotifier {
   /**
    * 텍스트 길이 제한
    */
-  truncateText(text, maxLength) {
+  private truncateText(text: string | undefined, maxLength: number): string {
     if (!text || text.length <= maxLength) {
-      return text;
+      return text || "";
     }
     return text.substring(0, maxLength - 3) + "...";
   }
@@ -102,7 +136,7 @@ export class DiscordNotifier {
   /**
    * 날짜 포맷팅
    */
-  formatDate(date) {
+  private formatDate(date: Date | string): string {
     return new Date(date).toLocaleDateString("ko-KR", {
       year: "numeric",
       month: "short",

@@ -1,8 +1,32 @@
+import { injectable, inject } from "tsyringe";
+import type { AIClient, AIOptions } from "../../../shared/interfaces/index.js";
+
+interface OpenAIMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
+interface OpenAIResponse {
+  choices: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+}
+
 /**
  * OpenAI API 클라이언트
  */
-export class OpenAIClient {
-  constructor(apiKey, defaultModel = "gpt-3.5-turbo") {
+@injectable()
+export class OpenAIClient implements AIClient {
+  private apiKey: string;
+  private defaultModel: string;
+  private baseUrl: string;
+
+  constructor(
+    @inject("OPENAI_API_KEY") apiKey: string,
+    defaultModel: string = "gpt-3.5-turbo"
+  ) {
     this.apiKey = apiKey;
     this.defaultModel = defaultModel;
     this.baseUrl = "https://api.openai.com/v1";
@@ -11,15 +35,18 @@ export class OpenAIClient {
   /**
    * 텍스트 생성
    */
-  async generateText(prompt, options = {}) {
-    const messages = [{ role: "user", content: prompt }];
+  async generateText(prompt: string, options: AIOptions = {}): Promise<string> {
+    const messages: OpenAIMessage[] = [{ role: "user", content: prompt }];
     return await this.chatCompletion(messages, options);
   }
 
   /**
    * 채팅 완성
    */
-  async chatCompletion(messages, options = {}) {
+  async chatCompletion(
+    messages: OpenAIMessage[],
+    options: AIOptions = {}
+  ): Promise<string> {
     const {
       maxTokens = 150,
       temperature = 0.7,
@@ -47,11 +74,11 @@ export class OpenAIClient {
         );
       }
 
-      const data = await response.json();
+      const data: OpenAIResponse = await response.json();
       return (
         data.choices[0]?.message?.content || "AI 요약을 생성할 수 없습니다."
       );
-    } catch (error) {
+    } catch (error: any) {
       throw new Error(`OpenAI 생성 실패: ${error.message}`);
     }
   }

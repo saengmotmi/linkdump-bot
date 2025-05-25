@@ -1,22 +1,24 @@
+import { injectable, inject } from "tsyringe";
+import type { BackgroundTaskRunner } from "../../../shared/interfaces/index.js";
+
 /**
  * Cloudflare Workers 환경 백그라운드 태스크 러너
  */
-export class WorkersBackgroundRunner {
-  constructor(workersRuntime) {
-    this.workersRuntime = workersRuntime;
-  }
+@injectable()
+export class WorkersBackgroundRunner implements BackgroundTaskRunner {
+  constructor(@inject("WORKERS_RUNTIME") private workersRuntime: any) {}
 
   /**
    * 백그라운드 태스크 스케줄링
    */
-  schedule(task) {
+  async schedule(task: () => Promise<void>): Promise<void> {
     this.workersRuntime.scheduleBackgroundTask(task);
   }
 
   /**
    * 지연된 태스크 스케줄링
    */
-  scheduleDelayed(task, delayMs) {
+  scheduleDelayed(task: () => Promise<void>, delayMs: number): void {
     this.workersRuntime.scheduleBackgroundTask(async () => {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       await task();
@@ -26,7 +28,11 @@ export class WorkersBackgroundRunner {
   /**
    * 반복 태스크 스케줄링 (제한된 횟수)
    */
-  scheduleRepeating(task, intervalMs, maxRuns = 5) {
+  scheduleRepeating(
+    task: () => Promise<void>,
+    intervalMs: number,
+    maxRuns: number = 5
+  ): void {
     let runCount = 0;
 
     const repeatingTask = async () => {

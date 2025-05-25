@@ -1,15 +1,30 @@
+import { injectable, inject } from "tsyringe";
+import type {
+  AISummarizer,
+  AIClient,
+} from "../../../shared/interfaces/index.js";
+import { TOKENS } from "../../../shared/interfaces/index.js";
+
 /**
  * OpenAI 기반 AI 요약 구현체
  */
-export class OpenAISummarizer {
-  constructor(openaiClient) {
+@injectable()
+export class OpenAISummarizer implements AISummarizer {
+  private openaiClient: AIClient;
+
+  constructor(@inject(TOKENS.AIClient) openaiClient: AIClient) {
     this.openaiClient = openaiClient;
   }
 
   /**
    * 콘텐츠 요약 생성
    */
-  async summarize({ url, title, description }) {
+  async summarize(content: {
+    url: string;
+    title?: string;
+    description?: string;
+  }): Promise<string> {
+    const { url, title, description } = content;
     const prompt = this.buildPrompt(url, title, description);
 
     try {
@@ -19,7 +34,7 @@ export class OpenAISummarizer {
       });
 
       return this.cleanupSummary(summary);
-    } catch (error) {
+    } catch (error: any) {
       console.warn("OpenAI 요약 실패:", error);
       return this.generateFallbackSummary(title, description);
     }
@@ -28,7 +43,11 @@ export class OpenAISummarizer {
   /**
    * 요약 프롬프트 생성
    */
-  buildPrompt(url, title, description) {
+  private buildPrompt(
+    url: string,
+    title?: string,
+    description?: string
+  ): string {
     return `다음 웹페이지를 한국어로 간단히 요약해주세요:
 
 URL: ${url}
@@ -46,7 +65,7 @@ URL: ${url}
   /**
    * 요약 결과 정리
    */
-  cleanupSummary(summary) {
+  private cleanupSummary(summary: string): string {
     return summary
       .trim()
       .replace(/^요약:\s*/i, "")
@@ -57,7 +76,10 @@ URL: ${url}
   /**
    * 폴백 요약 생성
    */
-  generateFallbackSummary(title, description) {
+  private generateFallbackSummary(
+    title?: string,
+    description?: string
+  ): string {
     if (title && description) {
       return `${title}: ${description}`.substring(0, 200);
     }

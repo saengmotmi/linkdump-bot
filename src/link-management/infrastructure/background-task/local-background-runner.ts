@@ -1,24 +1,26 @@
+import { injectable } from "tsyringe";
+import type { BackgroundTaskRunner } from "../../../shared/interfaces/index.js";
+
 /**
  * 로컬 개발 환경 백그라운드 태스크 러너
  */
-export class LocalBackgroundRunner {
-  constructor() {
-    this.taskQueue = [];
-    this.isProcessing = false;
-  }
+@injectable()
+export class LocalBackgroundRunner implements BackgroundTaskRunner {
+  private taskQueue: Array<() => Promise<void>> = [];
+  private isProcessing: boolean = false;
 
   /**
    * 백그라운드 태스크 스케줄링
    */
-  schedule(task) {
+  async schedule(task: () => Promise<void>): Promise<void> {
     this.taskQueue.push(task);
-    this.processQueue();
+    await this.processQueue();
   }
 
   /**
    * 지연된 태스크 스케줄링
    */
-  scheduleDelayed(task, delayMs) {
+  scheduleDelayed(task: () => Promise<void>, delayMs: number): void {
     setTimeout(() => {
       this.schedule(task);
     }, delayMs);
@@ -27,7 +29,11 @@ export class LocalBackgroundRunner {
   /**
    * 반복 태스크 스케줄링
    */
-  scheduleRepeating(task, intervalMs, maxRuns = 5) {
+  scheduleRepeating(
+    task: () => Promise<void>,
+    intervalMs: number,
+    maxRuns: number = 5
+  ): void {
     let runCount = 0;
 
     const repeatingTask = async () => {
@@ -53,7 +59,7 @@ export class LocalBackgroundRunner {
   /**
    * 태스크 큐 처리
    */
-  async processQueue() {
+  private async processQueue(): Promise<void> {
     if (this.isProcessing || this.taskQueue.length === 0) {
       return;
     }
@@ -63,10 +69,12 @@ export class LocalBackgroundRunner {
     while (this.taskQueue.length > 0) {
       const task = this.taskQueue.shift();
 
-      try {
-        await task();
-      } catch (error) {
-        console.error("백그라운드 태스크 실행 실패:", error);
+      if (task) {
+        try {
+          await task();
+        } catch (error) {
+          console.error("백그라운드 태스크 실행 실패:", error);
+        }
       }
     }
 
@@ -76,14 +84,14 @@ export class LocalBackgroundRunner {
   /**
    * 대기 중인 태스크 수 조회
    */
-  getPendingTaskCount() {
+  getPendingTaskCount(): number {
     return this.taskQueue.length;
   }
 
   /**
    * 모든 태스크 완료 대기
    */
-  async waitForCompletion() {
+  async waitForCompletion(): Promise<void> {
     while (this.isProcessing || this.taskQueue.length > 0) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }

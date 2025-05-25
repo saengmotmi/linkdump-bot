@@ -2,18 +2,24 @@
   "name": "linkdump-bot",
   "version": "2.0.0",
   "description": "완전 무료 Cloudflare Workers AI 기반 링크 공유 봇",
+  "type": "module",
   "main": "workers/app.js",
   "scripts": {
-    "dev": "cd workers && wrangler dev",
-    "deploy": "cd workers && wrangler deploy",
-    "test": "vitest --run",
-    "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage"
+    "dev": "tsx --watch workers/app.ts",
+    "start": "tsx workers/app.ts",
+    "demo": "tsx quick-test.ts",
+    "test": "tsx test/*.ts",
+    "check:types": "tsc --noEmit",
+    "build": "tsc",
+    "lint": "eslint . --ext .ts,.js"
   },
   "packageManager": "yarn@4.0.0",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20231218.0",
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "@types/node": "^22.15.21",
     "@vitest/coverage-v8": "^1.0.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
     "vitest": "^1.0.0"
   },
   "keywords": [
@@ -28,5 +34,9 @@
     "interface-based"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0"
+  }
 }

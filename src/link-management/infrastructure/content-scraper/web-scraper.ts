@@ -1,9 +1,28 @@
+import { injectable } from "tsyringe";
+import type { ContentScraper } from "../../../shared/interfaces/index.js";
+
+interface ScrapingOptions {
+  timeout?: number;
+  userAgent?: string;
+}
+
+interface ScrapedContent {
+  title?: string;
+  description?: string;
+  image?: string;
+  scrapedAt: Date;
+}
+
 /**
  * 웹 콘텐츠 스크래핑 구현체
  * HTML에서 메타데이터를 추출합니다.
  */
-export class WebContentScraper {
-  constructor(options = {}) {
+@injectable()
+export class WebContentScraper implements ContentScraper {
+  private timeout: number;
+  private userAgent: string;
+
+  constructor(options: ScrapingOptions = {}) {
     this.timeout = options.timeout || 10000;
     this.userAgent = options.userAgent || "LinkDump-Bot/1.0";
   }
@@ -11,7 +30,11 @@ export class WebContentScraper {
   /**
    * URL에서 콘텐츠 스크래핑
    */
-  async scrape(url) {
+  async scrape(url: string): Promise<{
+    title?: string;
+    description?: string;
+    content?: string;
+  }> {
     try {
       const response = await fetch(url, {
         headers: {
@@ -25,8 +48,14 @@ export class WebContentScraper {
       }
 
       const html = await response.text();
-      return this.parseMetadata(html);
-    } catch (error) {
+      const metadata = this.parseMetadata(html);
+
+      return {
+        title: metadata.title,
+        description: metadata.description,
+        content: html.substring(0, 1000), // 처음 1000자만 content로 제공
+      };
+    } catch (error: any) {
       throw new Error(`스크래핑 실패: ${error.message}`);
     }
   }
@@ -34,7 +63,7 @@ export class WebContentScraper {
   /**
    * HTML에서 메타데이터 파싱
    */
-  parseMetadata(html) {
+  private parseMetadata(html: string): ScrapedContent {
     // Open Graph 태그 우선 추출
     const ogTitle = this.extractMetaContent(html, "og:title");
     const ogDescription = this.extractMetaContent(html, "og:description");
@@ -45,9 +74,9 @@ export class WebContentScraper {
     const descriptionMatch = this.extractMetaContent(html, "description");
 
     return {
-      title: ogTitle || (titleMatch ? titleMatch[1].trim() : null),
-      description: ogDescription || descriptionMatch,
-      image: ogImage,
+      title: ogTitle || (titleMatch ? titleMatch[1].trim() : undefined),
+      description: ogDescription || descriptionMatch || undefined,
+      image: ogImage || undefined,
       scrapedAt: new Date(),
     };
   }
@@ -55,7 +84,7 @@ export class WebContentScraper {
   /**
    * 메타 태그 content 추출
    */
-  extractMetaContent(html, property) {
+  private extractMetaContent(html: string, property: string): string | null {
     const patterns = [
       new RegExp(
         `<meta\\s+property=["']og:${property}["']\\s+content=["']([^"']*?)["']`,
