@@ -1,6 +1,28 @@
+/**
+ * 🚀 LinkDump Bot - 메인 진입점 (Main Entry Point)
+ *
+ * Cloudflare Workers 환경에서 실행되는 메인 애플리케이션입니다.
+ *
+ * 핵심 실행 흐름:
+ * 1. 이 파일 (workers/app.ts) - HTTP 요청 받기
+ * 2. cloudflare-container.ts - 의존성 주입 설정
+ * 3. LinkManagementService - 비즈니스 로직 실행
+ * 4. Infrastructure 레이어 - 외부 서비스 호출
+ *
+ * 주요 기능:
+ * - 웹 UI 서빙 (GET /)
+ * - REST API 엔드포인트 (/api/*)
+ * - Discord 웹훅 연동
+ * - AI 기반 링크 처리
+ *
+ * 로컬 개발: npm run dev:local
+ * 배포: npm run deploy
+ */
+
 import "reflect-metadata";
 import { container } from "tsyringe";
-import { createCloudflareContainer } from "../src/shared/container/cloudflare-container.js";
+// ⭐ 핵심! 의존성 주입 설정 - 이 파일이 전체 앱의 핵심 설정을 담당
+import { createCloudflareContainer } from "../src/link-management/di/cloudflare-container.js";
 import { LinkManagementService } from "../src/link-management/application/link-management-service.js";
 import { TOKENS, type Config } from "../src/shared/interfaces/index.js";
 
@@ -20,10 +42,12 @@ export default {
     ctx: ExecutionContext
   ): Promise<Response> {
     try {
-      // TSyringe 컨테이너 설정
+      // ⭐ 핵심 흐름 1단계: 의존성 주입 컨테이너 설정
+      // cloudflare-container.ts에서 모든 서비스들을 설정하고 연결
       await createCloudflareContainer(env, ctx);
 
-      // 서비스 해결
+      // ⭐ 핵심 흐름 2단계: 비즈니스 로직 서비스 가져오기
+      // 컨테이너에서 설정된 서비스를 해결(resolve)
       const linkManagementService = container.resolve(LinkManagementService);
 
       const url = new URL(request.url);

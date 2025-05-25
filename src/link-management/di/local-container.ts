@@ -1,12 +1,24 @@
+/**
+ * 🛠️ 로컬 개발 환경 의존성 주입 컨테이너
+ *
+ * 로컬 개발 환경에서 사용되는 서비스들을 설정합니다:
+ * - File Storage (로컬 파일 시스템)
+ * - Mock AI Client (더미 AI 서비스)
+ * - Console Logger (콘솔 로깅)
+ * - Local Background Runner (로컬 백그라운드 작업)
+ *
+ * 사용처: 로컬 개발 시 테스트 코드에서 사용
+ */
+
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type { Config } from "../interfaces/index.js";
-import { TOKENS } from "../interfaces/index.js";
+import type { Config } from "../../shared/interfaces/index.js";
+import { TOKENS } from "../../shared/interfaces/index.js";
 import {
   setupContainer,
   type ServiceConfig,
   type ServiceDependencies,
-} from "./service-registry.js";
+} from "../../shared/container/service-registry.js";
 
 /**
  * 로컬 개발 환경 서비스 설정 정의
@@ -25,8 +37,7 @@ function createLocalServiceConfig(
     },
     {
       token: TOKENS.Storage,
-      importFn: () =>
-        import("../../link-management/infrastructure/storage/file-storage.js"),
+      importFn: () => import("../infrastructure/storage/file-storage.js"),
       class: "FileStorage",
       factory: (deps: ServiceDependencies) => {
         return new deps.FileStorage("./data");
@@ -34,10 +45,7 @@ function createLocalServiceConfig(
     },
     {
       token: TOKENS.LinkRepository,
-      importFn: () =>
-        import(
-          "../../link-management/infrastructure/storage-link-repository.js"
-        ),
+      importFn: () => import("../infrastructure/storage-link-repository.js"),
       class: "StorageLinkRepository",
       factory: (deps: ServiceDependencies) => {
         return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
@@ -46,9 +54,7 @@ function createLocalServiceConfig(
     {
       token: TOKENS.AIClient,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/ai-provider/workers-ai-client.js"
-        ),
+        import("../infrastructure/ai-provider/workers-ai-client.js"),
       class: "WorkersAIClient",
       factory: (deps: ServiceDependencies) => {
         // 로컬 환경에서는 더미 AI 클라이언트 사용
@@ -58,9 +64,7 @@ function createLocalServiceConfig(
     {
       token: TOKENS.AISummarizer,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js"
-        ),
+        import("../infrastructure/ai-summarizer/workers-ai-summarizer.js"),
       class: "WorkersAISummarizer",
       factory: (deps: ServiceDependencies) => {
         return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
@@ -69,9 +73,7 @@ function createLocalServiceConfig(
     {
       token: TOKENS.ContentScraper,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/content-scraper/web-scraper.js"
-        ),
+        import("../infrastructure/content-scraper/web-scraper.js"),
       class: "WebContentScraper",
       factory: (deps: ServiceDependencies) => {
         return new deps.WebContentScraper();
@@ -80,9 +82,7 @@ function createLocalServiceConfig(
     {
       token: TOKENS.Notifier,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/notification/discord-notifier.js"
-        ),
+        import("../infrastructure/notification/discord-notifier.js"),
       class: "DiscordNotifier",
       factory: (deps: ServiceDependencies) => {
         const config = deps.resolve<Config>(TOKENS.Config);
@@ -92,9 +92,7 @@ function createLocalServiceConfig(
     {
       token: TOKENS.BackgroundTaskRunner,
       importFn: () =>
-        import(
-          "../../link-management/infrastructure/background-task/local-background-runner.js"
-        ),
+        import("../infrastructure/background-task/local-background-runner.js"),
       class: "LocalBackgroundRunner",
       factory: (deps: ServiceDependencies) => {
         return new deps.LocalBackgroundRunner();
