@@ -1,4 +1,3 @@
-import { injectable, inject } from "tsyringe";
 import type { Notifier, LinkData } from "../../../shared/interfaces/index.js";
 
 interface DiscordEmbed {
@@ -28,16 +27,13 @@ interface DiscordPayload {
 }
 
 /**
- * Discord 웹훅 기반 알림 구현체
+ * Discord 웹훅 알림 구현체
  */
-@injectable()
 export class DiscordNotifier implements Notifier {
   private webhookUrls: string[];
 
-  constructor(@inject("DISCORD_WEBHOOKS") webhookUrls: string[] = []) {
-    this.webhookUrls = Array.isArray(webhookUrls)
-      ? webhookUrls
-      : [webhookUrls].filter(Boolean);
+  constructor(webhookUrls: string[]) {
+    this.webhookUrls = webhookUrls;
   }
 
   /**

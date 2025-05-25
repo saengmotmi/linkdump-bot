@@ -1,4 +1,3 @@
-import { injectable } from "tsyringe";
 import type { ContentScraper } from "../../../shared/interfaces/index.js";
 
 interface ScrapingOptions {
@@ -14,17 +13,17 @@ interface ScrapedContent {
 }
 
 /**
- * 웹 콘텐츠 스크래핑 구현체
+ * 웹 콘텐츠 스크래퍼 구현체
  * HTML에서 메타데이터를 추출합니다.
  */
-@injectable()
 export class WebContentScraper implements ContentScraper {
-  private timeout: number;
-  private userAgent: string;
+  private options: Required<ScrapingOptions>;
 
   constructor(options: ScrapingOptions = {}) {
-    this.timeout = options.timeout || 10000;
-    this.userAgent = options.userAgent || "LinkDump-Bot/1.0";
+    this.options = {
+      timeout: options.timeout ?? 10000,
+      userAgent: options.userAgent ?? "LinkDump Bot 1.0",
+    };
   }
 
   /**
@@ -38,9 +37,9 @@ export class WebContentScraper implements ContentScraper {
     try {
       const response = await fetch(url, {
         headers: {
-          "User-Agent": this.userAgent,
+          "User-Agent": this.options.userAgent,
         },
-        signal: AbortSignal.timeout(this.timeout),
+        signal: AbortSignal.timeout(this.options.timeout),
       });
 
       if (!response.ok) {

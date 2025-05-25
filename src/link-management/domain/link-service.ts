@@ -93,10 +93,10 @@ export class LinkDomainService {
   }
 
   /**
-   * Discord로 전송할 링크들 조회
+   * 알림으로 전송할 링크들 조회
    */
-  async getLinksForDiscord(): Promise<Link[]> {
-    return await this.linkRepository.findByStatus("completed");
+  async getLinksForNotification(): Promise<Link[]> {
+    return this.linkRepository.findByStatus("completed");
   }
 
   /**

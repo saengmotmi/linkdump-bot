@@ -7,17 +7,24 @@ import { setupContainer, type ServiceConfig } from "./service-registry.js";
 /**
  * Cloudflare Workers 서비스 설정 정의
  */
-function createCloudflareServiceConfig(config: Config): ServiceConfig[] {
+function createCloudflareServiceConfig(env: any, ctx?: any): ServiceConfig[] {
   return [
+    // 설정 객체 - 환경별 설정값만 포함
     {
-      token: TOKENS.R2Bucket,
-      factory: (deps: any) => deps.env.LINKDUMP_STORAGE,
+      token: TOKENS.Config,
+      factory: () => ({
+        webhookUrls: env.DISCORD_WEBHOOKS
+          ? env.DISCORD_WEBHOOKS.split(",")
+          : [],
+        env,
+        ctx,
+      }),
     },
     {
       token: TOKENS.Storage,
       import: "../../link-management/infrastructure/storage/r2-storage.js",
       class: "R2Storage",
-      factory: (deps: any) => deps.container.resolve(deps.R2Storage),
+      factory: (deps: any) => new deps.R2Storage(env.LINKDUMP_R2_STORAGE),
     },
     {
       token: TOKENS.LinkRepository,
@@ -27,20 +34,11 @@ function createCloudflareServiceConfig(config: Config): ServiceConfig[] {
         new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage)),
     },
     {
-      token: TOKENS.FileStorage,
-      import: "../../link-management/infrastructure/storage/file-storage.js",
-      class: "FileStorage",
-      factory: (deps: any) => new deps.FileStorage("./data"),
-    },
-    {
       token: TOKENS.AIClient,
       import:
         "../../link-management/infrastructure/ai-provider/workers-ai-client.js",
       class: "WorkersAIClient",
-      factory: (deps: any) => {
-        const config = deps.resolve(TOKENS.Config);
-        return new deps.WorkersAIClient(config.env.AI);
-      },
+      factory: (deps: any) => new deps.WorkersAIClient(env.WORKERS_AI_MODEL),
     },
     {
       token: TOKENS.AISummarizer,
@@ -64,7 +62,7 @@ function createCloudflareServiceConfig(config: Config): ServiceConfig[] {
       class: "DiscordNotifier",
       factory: (deps: any) => {
         const config = deps.resolve(TOKENS.Config);
-        return new deps.DiscordNotifier(config.discordWebhooks || []);
+        return new deps.DiscordNotifier(config.webhookUrls || []);
       },
     },
     {
@@ -72,42 +70,8 @@ function createCloudflareServiceConfig(config: Config): ServiceConfig[] {
       import:
         "../../link-management/infrastructure/background-task/workers-background-runner.js",
       class: "WorkersBackgroundRunner",
-      factory: (deps: any) => {
-        const config = deps.resolve(TOKENS.Config);
-        return new deps.WorkersBackgroundRunner({
-          env: config.env,
-          ctx: config.ctx,
-        });
-      },
+      factory: (deps: any) => new deps.WorkersBackgroundRunner({ env, ctx }),
     },
-    {
-      token: TOKENS.Runtime,
-      import: "../../link-management/infrastructure/runtime/workers-runtime.js",
-      class: "WorkersRuntime",
-      factory: (deps: any) => {
-        const config = deps.resolve(TOKENS.Config);
-        return new deps.WorkersRuntime(config.env, config.ctx);
-      },
-    },
-    // 조건부 등록 - OpenAI 요약기
-    ...(config.openaiApiKey
-      ? [
-          {
-            token: TOKENS.OpenAISummarizer,
-            import:
-              "../../link-management/infrastructure/ai-summarizer/openai-summarizer.js",
-            class: "OpenAISummarizer",
-            factory: async (deps: any) => {
-              const config = deps.resolve(TOKENS.Config);
-              const { OpenAIClient } = await import(
-                "../../link-management/infrastructure/ai-provider/openai-client.js"
-              );
-              const openaiClient = new OpenAIClient(config.openaiApiKey!);
-              return new deps.OpenAISummarizer(openaiClient);
-            },
-          },
-        ]
-      : []),
   ];
 }
 
@@ -115,24 +79,11 @@ function createCloudflareServiceConfig(config: Config): ServiceConfig[] {
  * Cloudflare Workers 환경 컨테이너 설정
  */
 export async function setupCloudflareContainer(env: any, ctx?: any) {
-  // 설정 객체 생성 및 등록
-  const config: Config = {
-    aiProvider: "workers-ai",
-    storageProvider: "r2",
-    openaiApiKey: env.OPENAI_API_KEY,
-    discordWebhooks: env.DISCORD_WEBHOOKS
-      ? env.DISCORD_WEBHOOKS.split(",")
-      : [],
-    env,
-    ctx,
-  };
-  container.registerInstance(TOKENS.Config, config);
-
-  // 서비스 설정 생성
-  const serviceConfig = createCloudflareServiceConfig(config);
+  // 서비스 설정 생성 (설정 객체 포함)
+  const serviceConfig = createCloudflareServiceConfig(env, ctx);
 
   // 공통 컨테이너 설정 로직 사용
-  await setupContainer(serviceConfig, { env, ctx });
+  await setupContainer(serviceConfig);
 
   return container;
 }
@@ -141,6 +92,11 @@ export async function setupCloudflareContainer(env: any, ctx?: any) {
  * Cloudflare Workers 환경에서 컨테이너 생성
  */
 export async function createCloudflareContainer(env: any, ctx?: any) {
+  // 새로운 자식 컨테이너 생성 (격리를 위해)
+  const childContainer = container.createChildContainer();
+
+  // 설정 적용
   await setupCloudflareContainer(env, ctx);
-  return container;
+
+  return childContainer;
 }
