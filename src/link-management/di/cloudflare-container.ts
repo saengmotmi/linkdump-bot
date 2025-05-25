@@ -18,12 +18,23 @@
 
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type { Config, CloudflareEnv } from "../../shared/interfaces/index.js";
+import type {
+  Config,
+  CloudflareEnv,
+  Storage,
+  AIClient,
+  AISummarizer,
+  ContentScraper,
+  Notifier,
+  TaskQueue,
+  QueueProcessor,
+  BackgroundTaskRunner,
+} from "../../shared/interfaces/index.js";
 import { TOKENS } from "../../shared/interfaces/index.js";
 import {
   setupContainer,
+  safeResolve,
   type ServiceConfig,
-  type ServiceDependencies,
 } from "../../shared/container/service-registry.js";
 
 /**
@@ -37,7 +48,7 @@ function createCloudflareServiceConfig(
     // 설정 객체 - 환경별 설정값만 포함
     {
       token: TOKENS.Config,
-      factory: () => ({
+      importFn: async () => ({
         webhookUrls: env.DISCORD_WEBHOOKS
           ? env.DISCORD_WEBHOOKS.split(",")
           : [],
@@ -47,87 +58,109 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.Storage,
-      importFn: () => import("../infrastructure/storage/r2-storage.js"),
-      class: "R2Storage",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.R2Storage(env.LINKDUMP_STORAGE);
+      importFn: async () => {
+        const { R2Storage } = await import(
+          "../infrastructure/storage/r2-storage.js"
+        );
+        return new R2Storage(env.LINKDUMP_STORAGE as any);
       },
     },
     {
       token: TOKENS.LinkRepository,
-      importFn: () => import("../infrastructure/storage-link-repository.js"),
-      class: "StorageLinkRepository",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
+      importFn: async () => {
+        const { StorageLinkRepository } = await import(
+          "../infrastructure/storage-link-repository.js"
+        );
+        const storage = safeResolve<Storage>(TOKENS.Storage);
+        return new StorageLinkRepository(storage);
       },
     },
     {
       token: TOKENS.AIClient,
-      importFn: () =>
-        import("../infrastructure/ai-provider/workers-ai-client.js"),
-      class: "WorkersAIClient",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.WorkersAIClient(env.AI);
+      importFn: async () => {
+        // Claude API 키가 있으면 Claude 사용, 없으면 Workers AI 사용
+        if (env.CLAUDE_API_KEY) {
+          const { ClaudeAIClient } = await import(
+            "../infrastructure/ai-provider/claude-ai-client.js"
+          );
+          return new ClaudeAIClient(env.CLAUDE_API_KEY);
+        } else {
+          const { WorkersAIClient } = await import(
+            "../infrastructure/ai-provider/workers-ai-client.js"
+          );
+          return new WorkersAIClient(env.WORKERS_AI);
+        }
       },
     },
     {
       token: TOKENS.AISummarizer,
-      importFn: () =>
-        import("../infrastructure/ai-summarizer/workers-ai-summarizer.js"),
-      class: "WorkersAISummarizer",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
+      importFn: async () => {
+        // Claude API 키가 있으면 Claude 요약기 사용, 없으면 Workers AI 요약기 사용
+        if (env.CLAUDE_API_KEY) {
+          const { ClaudeAISummarizer } = await import(
+            "../infrastructure/ai-summarizer/claude-ai-summarizer.js"
+          );
+          const aiClient = safeResolve<AIClient>(TOKENS.AIClient);
+          return new ClaudeAISummarizer(aiClient);
+        } else {
+          const { WorkersAISummarizer } = await import(
+            "../infrastructure/ai-summarizer/workers-ai-summarizer.js"
+          );
+          const aiClient = safeResolve<AIClient>(TOKENS.AIClient);
+          return new WorkersAISummarizer(aiClient);
+        }
       },
     },
     {
       token: TOKENS.ContentScraper,
-      importFn: () =>
-        import("../infrastructure/content-scraper/web-scraper.js"),
-      class: "WebContentScraper",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.WebContentScraper();
+      importFn: async () => {
+        const { WebContentScraper } = await import(
+          "../infrastructure/content-scraper/web-scraper.js"
+        );
+        return new WebContentScraper();
       },
     },
     {
       token: TOKENS.Notifier,
-      importFn: () =>
-        import("../infrastructure/notification/discord-notifier.js"),
-      class: "DiscordNotifier",
-      factory: (deps: ServiceDependencies) => {
-        const config = deps.resolve<Config>(TOKENS.Config);
-        return new deps.DiscordNotifier(config.webhookUrls || []);
+      importFn: async () => {
+        const { DiscordNotifier } = await import(
+          "../infrastructure/notification/discord-notifier.js"
+        );
+        const config = safeResolve<Config>(TOKENS.Config);
+        return new DiscordNotifier(config.webhookUrls || []);
       },
     },
     {
       token: TOKENS.TaskQueue,
-      importFn: () => import("../../shared/queue/memory-task-queue.js"),
-      class: "MemoryTaskQueue",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.MemoryTaskQueue();
+      importFn: async () => {
+        const { MemoryTaskQueue } = await import(
+          "../../shared/queue/memory-task-queue.js"
+        );
+        return new MemoryTaskQueue();
       },
     },
     {
       token: TOKENS.QueueProcessor,
-      importFn: () =>
-        import("../../shared/queue/sequential-queue-processor.js"),
-      class: "SequentialQueueProcessor",
-      factory: (deps: ServiceDependencies) => {
-        const taskQueue = deps.resolve(TOKENS.TaskQueue);
-        return new deps.SequentialQueueProcessor(taskQueue);
+      importFn: async () => {
+        const { SequentialQueueProcessor } = await import(
+          "../../shared/queue/sequential-queue-processor.js"
+        );
+        const taskQueue = safeResolve<TaskQueue>(TOKENS.TaskQueue);
+        return new SequentialQueueProcessor(taskQueue);
       },
     },
     {
       token: TOKENS.BackgroundTaskRunner,
-      importFn: () =>
-        import(
+      importFn: async () => {
+        const { WorkersBackgroundRunner } = await import(
           "../infrastructure/background-task/workers-background-runner.js"
-        ),
-      class: "WorkersBackgroundRunner",
-      factory: (deps: ServiceDependencies) => {
-        const taskQueue = deps.resolve(TOKENS.TaskQueue);
-        const queueProcessor = deps.resolve(TOKENS.QueueProcessor);
-        return new deps.WorkersBackgroundRunner(
-          { env, ctx },
+        );
+        const taskQueue = safeResolve<TaskQueue>(TOKENS.TaskQueue);
+        const queueProcessor = safeResolve<QueueProcessor>(
+          TOKENS.QueueProcessor
+        );
+        return new WorkersBackgroundRunner(
+          { env, ctx: ctx as any },
           taskQueue,
           queueProcessor
         );
@@ -136,18 +169,23 @@ function createCloudflareServiceConfig(
     // Application Services
     {
       token: TOKENS.LinkManagementService,
-      importFn: () => import("../application/link-management-service.js"),
-      class: "LinkManagementService",
-      factory: (deps: ServiceDependencies) => {
-        const linkRepository = deps.resolve(TOKENS.LinkRepository);
-        const aiSummarizer = deps.resolve(TOKENS.AISummarizer);
-        const contentScraper = deps.resolve(TOKENS.ContentScraper);
-        const notifier = deps.resolve(TOKENS.Notifier);
-        const backgroundTaskRunner = deps.resolve(TOKENS.BackgroundTaskRunner);
-        return new deps.LinkManagementService(
+      importFn: async () => {
+        const { LinkManagementService } = await import(
+          "../application/link-management-service.js"
+        );
+        const linkRepository = safeResolve<any>(TOKENS.LinkRepository);
+        const aiSummarizer = safeResolve<AISummarizer>(TOKENS.AISummarizer);
+        const contentScraper = safeResolve<ContentScraper>(
+          TOKENS.ContentScraper
+        );
+        const notifier = safeResolve<Notifier>(TOKENS.Notifier);
+        const backgroundTaskRunner = safeResolve<BackgroundTaskRunner>(
+          TOKENS.BackgroundTaskRunner
+        );
+        return new LinkManagementService(
           linkRepository,
-          aiSummarizer,
           contentScraper,
+          aiSummarizer,
           notifier,
           backgroundTaskRunner
         );
@@ -156,37 +194,39 @@ function createCloudflareServiceConfig(
     // API Controllers
     {
       token: TOKENS.LinkController,
-      importFn: () => import("../../web/api/controllers/link-controller.js"),
-      class: "LinkController",
-      factory: (deps: ServiceDependencies) => {
-        const linkManagementService = deps.resolve(
+      importFn: async () => {
+        const { LinkController } = await import(
+          "../../web/api/controllers/link-controller.js"
+        );
+        const linkManagementService = safeResolve<any>(
           TOKENS.LinkManagementService
         );
-        return new deps.LinkController(linkManagementService);
+        return new LinkController(linkManagementService);
       },
     },
     {
       token: TOKENS.ConfigController,
-      importFn: () => import("../../web/api/controllers/config-controller.js"),
-      class: "ConfigController",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.ConfigController();
+      importFn: async () => {
+        const { ConfigController } = await import(
+          "../../web/api/controllers/config-controller.js"
+        );
+        return new ConfigController();
       },
     },
     {
       token: TOKENS.PreviewController,
-      importFn: () => import("../../web/api/controllers/preview-controller.js"),
-      class: "PreviewController",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.PreviewController();
+      importFn: async () => {
+        const { PreviewController } = await import(
+          "../../web/api/controllers/preview-controller.js"
+        );
+        return new PreviewController();
       },
     },
     {
       token: TOKENS.ApiRouter,
-      importFn: () => import("../../web/api/api-router.js"),
-      class: "ApiRouter",
-      factory: (deps: ServiceDependencies) => {
-        return new deps.ApiRouter();
+      importFn: async () => {
+        const { ApiRouter } = await import("../../web/api/api-router.js");
+        return new ApiRouter();
       },
     },
   ];

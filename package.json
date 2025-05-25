@@ -36,6 +36,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.52.0",
     "reflect-metadata": "^0.2.2",
     "tsyringe": "^4.10.0"
   }

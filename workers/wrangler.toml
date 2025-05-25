@@ -10,7 +10,7 @@ bucket_name = "linkdump-data"
 
 # Workers AI binding
 [ai]
-binding = "AI"
+binding = "WORKERS_AI"
 
 # Secrets (set with `wrangler secret put <name>`):
 # wrangler secret put DISCORD_WEBHOOKS

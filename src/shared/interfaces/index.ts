@@ -24,9 +24,10 @@ export interface LinkData {
  */
 export interface CloudflareEnv {
   LINKDUMP_STORAGE: R2Bucket;
-  AI: Ai;
+  WORKERS_AI: Ai;
   DISCORD_WEBHOOKS?: string;
   OPENAI_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
   CF_PAGES?: string;
 }
 
