@@ -267,42 +267,37 @@ async function scrapeOGTags(url) {
   }
 }
 
-// AI 요약 생성
+// AI 요약 생성 (Cloudflare Workers AI - 완전 무료!)
 async function generateSummary(env, ogData, url) {
   try {
-    const prompt = \`다음 웹페이지 정보를 바탕으로 "왜 이 링크를 클릭해야 하는지"에 대한 매력적인 3줄 요약을 한국어로 작성해주세요:
+    const prompt = \`Create an engaging 3-line summary in Korean explaining "why someone should click this link". Focus on the value and benefits to the reader.
 
-제목: \${ogData.title}
-설명: \${ogData.description}
-사이트: \${ogData.site_name}
+Website Information:
+Title: \${ogData.title}
+Description: \${ogData.description}
+Site: \${ogData.site_name}
 URL: \${url}
 
-요약은 클릭 동기를 부여하는 방향으로 작성해주세요.\`;
+Write a compelling summary in Korean that motivates clicking:\`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }]
-      })
+    const response = await env.AI.run('@cf/meta/llama-3.2-1b-instruct', {
+      messages: [
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      max_tokens: 150
     });
 
-    if (!response.ok) {
-      throw new Error(\`Anthropic API error: \${response.status}\`);
-    }
-
-    const result = await response.json();
-    return result.content[0].text.trim();
+    // Workers AI 응답 형식에 맞게 처리
+    const summary = response.response || response.result || 'AI 요약을 생성할 수 없습니다.';
+    return summary.trim();
     
   } catch (error) {
-    console.error('Failed to generate summary:', error);
-    return \`\${ogData.title}\\n\${ogData.description}\`;
+    console.error('Failed to generate summary with Workers AI:', error);
+    // 폴백: 기본 한국어 요약
+    return \`🔗 \${ogData.title}\\n📝 \${ogData.description}\\n🎯 자세한 내용을 확인해보세요!\`;
   }
 }
 
@@ -500,7 +495,7 @@ function getWebPage(url) {
         <h1>🚀 LinkDump Bot</h1>
         
         <div class="info">
-            ⚡ 링크를 추가하면 즉시 R2에 저장되고, 백그라운드에서 AI 요약을 생성해 Discord로 전송합니다!
+            ⚡ 링크를 추가하면 즉시 R2에 저장되고, 백그라운드에서 Cloudflare Workers AI가 무료로 요약을 생성해 Discord로 전송합니다!
         </div>
 
         <form id="linkForm">
@@ -578,7 +573,7 @@ function getWebPage(url) {
                     if (isManualProcess) {
                         messageDiv.innerHTML = \`<div class="success">✅ \${result.message}</div>\`;
                     } else {
-                        messageDiv.innerHTML = '<div class="success">✅ 링크가 저장되었습니다! 백그라운드에서 AI 처리 중...</div>';
+                        messageDiv.innerHTML = '<div class="success">✅ 링크가 저장되었습니다! 백그라운드에서 Workers AI가 무료 처리 중...</div>';
                         document.getElementById('linkForm').reset();
                     }
                 } else {

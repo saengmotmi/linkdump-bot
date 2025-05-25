@@ -1,19 +1,14 @@
 {
   "name": "linkdump-bot",
-  "version": "1.0.0",
-  "description": "Cloudflare Workers-based link sharing bot for Discord with AI summaries",
+  "version": "2.0.0",
+  "description": "완전 무료 Cloudflare Workers AI 기반 링크 공유 봇",
   "main": "workers/complete-app.js",
   "scripts": {
-    "process-links-r2": "node src/process-links-r2.js"
+    "deploy": "cd workers && wrangler deploy"
   },
-  "dependencies": {
-    "axios": "^1.6.0",
-    "cheerio": "^1.0.0-rc.12",
-    "@anthropic-ai/sdk": "^0.24.0",
-    "@aws-sdk/client-s3": "^3.490.0"
-  },
+  "dependencies": {},
   "devDependencies": {},
-  "keywords": ["discord", "bot", "automation", "links"],
+  "keywords": ["discord", "bot", "automation", "links", "cloudflare", "workers-ai", "무료"],
   "author": "",
   "license": "MIT"
 }
