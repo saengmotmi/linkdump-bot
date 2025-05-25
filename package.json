@@ -7,21 +7,20 @@
   "scripts": {
     "dev": "tsx --watch workers/app.ts",
     "start": "tsx workers/app.ts",
-    "demo": "tsx quick-test.ts",
-    "test": "tsx test/*.ts",
     "check:types": "tsc --noEmit",
-    "build": "tsc",
-    "lint": "eslint . --ext .ts,.js"
+    "deploy": "cd workers && wrangler deploy",
+    "dev:local": "cd workers && wrangler dev --local --port ${DEV_PORT:-8787}",
+    "dev:remote": "cd workers && wrangler dev --port ${DEV_PORT:-8787}",
+    "open:worker": "open ${WORKER_URL:-https://linkdump-bot.ohjtack.workers.dev}",
+    "deployments": "cd workers && wrangler deployments list"
   },
   "packageManager": "yarn@4.0.0",
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",
     "@types/node": "^22.15.21",
-    "@vitest/coverage-v8": "^1.0.0",
     "discord-api-types": "^0.38.8",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3",
-    "vitest": "^1.0.0"
+    "typescript": "^5.8.3"
   },
   "keywords": [
     "discord",

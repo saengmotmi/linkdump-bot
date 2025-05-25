@@ -37,7 +37,8 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.Storage,
-      import: "../../link-management/infrastructure/storage/r2-storage.js",
+      importFn: () =>
+        import("../../link-management/infrastructure/storage/r2-storage.js"),
       class: "R2Storage",
       factory: (deps: ServiceDependencies) => {
         return new deps.R2Storage(env.LINKDUMP_STORAGE);
@@ -45,7 +46,10 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.LinkRepository,
-      import: "../../link-management/infrastructure/storage-link-repository.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/storage-link-repository.js"
+        ),
       class: "StorageLinkRepository",
       factory: (deps: ServiceDependencies) => {
         return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
@@ -53,8 +57,10 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.AIClient,
-      import:
-        "../../link-management/infrastructure/ai-provider/workers-ai-client.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/ai-provider/workers-ai-client.js"
+        ),
       class: "WorkersAIClient",
       factory: (deps: ServiceDependencies) => {
         return new deps.WorkersAIClient(env.AI);
@@ -62,8 +68,10 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.AISummarizer,
-      import:
-        "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js"
+        ),
       class: "WorkersAISummarizer",
       factory: (deps: ServiceDependencies) => {
         return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
@@ -71,8 +79,10 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.ContentScraper,
-      import:
-        "../../link-management/infrastructure/content-scraper/web-scraper.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/content-scraper/web-scraper.js"
+        ),
       class: "WebContentScraper",
       factory: (deps: ServiceDependencies) => {
         return new deps.WebContentScraper();
@@ -80,8 +90,10 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.Notifier,
-      import:
-        "../../link-management/infrastructure/notification/discord-notifier.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/notification/discord-notifier.js"
+        ),
       class: "DiscordNotifier",
       factory: (deps: ServiceDependencies) => {
         const config = deps.resolve<Config>(TOKENS.Config);
@@ -90,8 +102,10 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.BackgroundTaskRunner,
-      import:
-        "../../link-management/infrastructure/background-task/workers-background-runner.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/background-task/workers-background-runner.js"
+        ),
       class: "WorkersBackgroundRunner",
       factory: (deps: ServiceDependencies) => {
         return new deps.WorkersBackgroundRunner({ env, ctx });

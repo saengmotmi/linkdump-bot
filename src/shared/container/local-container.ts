@@ -15,29 +15,29 @@ function createLocalServiceConfig(
   configOverrides: Partial<Config> = {}
 ): ServiceConfig[] {
   return [
-    // 설정 객체 - 환경별 설정값만 포함
+    // 설정 객체
     {
       token: TOKENS.Config,
       factory: () => ({
-        dataPath: "./data",
-        webhookUrls: process.env.DISCORD_WEBHOOKS
-          ? JSON.parse(process.env.DISCORD_WEBHOOKS)
-          : [],
+        webhookUrls: [],
         ...configOverrides,
       }),
     },
     {
       token: TOKENS.Storage,
-      import: "../../link-management/infrastructure/storage/file-storage.js",
+      importFn: () =>
+        import("../../link-management/infrastructure/storage/file-storage.js"),
       class: "FileStorage",
       factory: (deps: ServiceDependencies) => {
-        const config = deps.resolve<Config>(TOKENS.Config);
-        return new deps.FileStorage(config.dataPath || "./data");
+        return new deps.FileStorage("./data");
       },
     },
     {
       token: TOKENS.LinkRepository,
-      import: "../../link-management/infrastructure/storage-link-repository.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/storage-link-repository.js"
+        ),
       class: "StorageLinkRepository",
       factory: (deps: ServiceDependencies) => {
         return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
@@ -45,23 +45,22 @@ function createLocalServiceConfig(
     },
     {
       token: TOKENS.AIClient,
-      import:
-        "../../link-management/infrastructure/ai-provider/workers-ai-client.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/ai-provider/workers-ai-client.js"
+        ),
       class: "WorkersAIClient",
       factory: (deps: ServiceDependencies) => {
-        // 로컬 환경에서는 mock AI binding 사용
-        const mockAI = {
-          run: async (model: string, options: Record<string, unknown>) => {
-            return { response: "Mock AI response for local development" };
-          },
-        };
-        return new deps.WorkersAIClient(mockAI);
+        // 로컬 환경에서는 더미 AI 클라이언트 사용
+        return new deps.WorkersAIClient(null);
       },
     },
     {
       token: TOKENS.AISummarizer,
-      import:
-        "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js"
+        ),
       class: "WorkersAISummarizer",
       factory: (deps: ServiceDependencies) => {
         return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
@@ -69,8 +68,10 @@ function createLocalServiceConfig(
     },
     {
       token: TOKENS.ContentScraper,
-      import:
-        "../../link-management/infrastructure/content-scraper/web-scraper.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/content-scraper/web-scraper.js"
+        ),
       class: "WebContentScraper",
       factory: (deps: ServiceDependencies) => {
         return new deps.WebContentScraper();
@@ -78,8 +79,10 @@ function createLocalServiceConfig(
     },
     {
       token: TOKENS.Notifier,
-      import:
-        "../../link-management/infrastructure/notification/discord-notifier.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/notification/discord-notifier.js"
+        ),
       class: "DiscordNotifier",
       factory: (deps: ServiceDependencies) => {
         const config = deps.resolve<Config>(TOKENS.Config);
@@ -88,8 +91,10 @@ function createLocalServiceConfig(
     },
     {
       token: TOKENS.BackgroundTaskRunner,
-      import:
-        "../../link-management/infrastructure/background-task/local-background-runner.js",
+      importFn: () =>
+        import(
+          "../../link-management/infrastructure/background-task/local-background-runner.js"
+        ),
       class: "LocalBackgroundRunner",
       factory: (deps: ServiceDependencies) => {
         return new deps.LocalBackgroundRunner();

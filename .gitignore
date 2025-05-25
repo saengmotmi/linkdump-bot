@@ -4,3 +4,14 @@ node_modules/
 .wrangler/
 dist/
 coverage/
+
+# 환경 변수 파일들
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+
+# Workers 관련
+workers/dist/
+workers/deploy-*/
