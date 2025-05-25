@@ -15,8 +15,13 @@ import { container } from "tsyringe";
 export interface ServiceConfig {
   token: symbol;
   importFn: () => Promise<any>; // 인스턴스를 직접 반환
-  isDirectInstance: boolean; // 항상 true
-  factory: () => void; // 사용되지 않음 (하위 호환성을 위해 유지)
+}
+
+/**
+ * 타입 안전한 resolve 함수 - 제네릭 사용
+ */
+export function safeResolve<T>(token: symbol): T {
+  return container.resolve<T>(token);
 }
 
 /**

@@ -18,10 +18,22 @@
 
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type { Config, CloudflareEnv } from "../../shared/interfaces/index.js";
+import type {
+  Config,
+  CloudflareEnv,
+  Storage,
+  AIClient,
+  AISummarizer,
+  ContentScraper,
+  Notifier,
+  TaskQueue,
+  QueueProcessor,
+  BackgroundTaskRunner,
+} from "../../shared/interfaces/index.js";
 import { TOKENS } from "../../shared/interfaces/index.js";
 import {
   setupContainer,
+  safeResolve,
   type ServiceConfig,
 } from "../../shared/container/service-registry.js";
 
@@ -43,8 +55,6 @@ function createCloudflareServiceConfig(
         env,
         ctx,
       }),
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.Storage,
@@ -54,8 +64,6 @@ function createCloudflareServiceConfig(
         );
         return new R2Storage(env.LINKDUMP_STORAGE as any);
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.LinkRepository,
@@ -63,11 +71,9 @@ function createCloudflareServiceConfig(
         const { StorageLinkRepository } = await import(
           "../infrastructure/storage-link-repository.js"
         );
-        const storage = container.resolve(TOKENS.Storage) as any;
+        const storage = safeResolve<Storage>(TOKENS.Storage);
         return new StorageLinkRepository(storage);
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.AIClient,
@@ -85,8 +91,6 @@ function createCloudflareServiceConfig(
           return new WorkersAIClient(env.WORKERS_AI);
         }
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.AISummarizer,
@@ -96,18 +100,16 @@ function createCloudflareServiceConfig(
           const { ClaudeAISummarizer } = await import(
             "../infrastructure/ai-summarizer/claude-ai-summarizer.js"
           );
-          const aiClient = container.resolve(TOKENS.AIClient) as any;
+          const aiClient = safeResolve<AIClient>(TOKENS.AIClient);
           return new ClaudeAISummarizer(aiClient);
         } else {
           const { WorkersAISummarizer } = await import(
             "../infrastructure/ai-summarizer/workers-ai-summarizer.js"
           );
-          const aiClient = container.resolve(TOKENS.AIClient) as any;
+          const aiClient = safeResolve<AIClient>(TOKENS.AIClient);
           return new WorkersAISummarizer(aiClient);
         }
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.ContentScraper,
@@ -117,8 +119,6 @@ function createCloudflareServiceConfig(
         );
         return new WebContentScraper();
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.Notifier,
@@ -126,11 +126,9 @@ function createCloudflareServiceConfig(
         const { DiscordNotifier } = await import(
           "../infrastructure/notification/discord-notifier.js"
         );
-        const config = container.resolve(TOKENS.Config) as any;
+        const config = safeResolve<Config>(TOKENS.Config);
         return new DiscordNotifier(config.webhookUrls || []);
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.TaskQueue,
@@ -140,8 +138,6 @@ function createCloudflareServiceConfig(
         );
         return new MemoryTaskQueue();
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.QueueProcessor,
@@ -149,11 +145,9 @@ function createCloudflareServiceConfig(
         const { SequentialQueueProcessor } = await import(
           "../../shared/queue/sequential-queue-processor.js"
         );
-        const taskQueue = container.resolve(TOKENS.TaskQueue) as any;
+        const taskQueue = safeResolve<TaskQueue>(TOKENS.TaskQueue);
         return new SequentialQueueProcessor(taskQueue);
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.BackgroundTaskRunner,
@@ -161,16 +155,16 @@ function createCloudflareServiceConfig(
         const { WorkersBackgroundRunner } = await import(
           "../infrastructure/background-task/workers-background-runner.js"
         );
-        const taskQueue = container.resolve(TOKENS.TaskQueue) as any;
-        const queueProcessor = container.resolve(TOKENS.QueueProcessor) as any;
+        const taskQueue = safeResolve<TaskQueue>(TOKENS.TaskQueue);
+        const queueProcessor = safeResolve<QueueProcessor>(
+          TOKENS.QueueProcessor
+        );
         return new WorkersBackgroundRunner(
           { env, ctx: ctx as any },
           taskQueue,
           queueProcessor
         );
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     // Application Services
     {
@@ -179,13 +173,15 @@ function createCloudflareServiceConfig(
         const { LinkManagementService } = await import(
           "../application/link-management-service.js"
         );
-        const linkRepository = container.resolve(TOKENS.LinkRepository) as any;
-        const aiSummarizer = container.resolve(TOKENS.AISummarizer) as any;
-        const contentScraper = container.resolve(TOKENS.ContentScraper) as any;
-        const notifier = container.resolve(TOKENS.Notifier) as any;
-        const backgroundTaskRunner = container.resolve(
+        const linkRepository = safeResolve<any>(TOKENS.LinkRepository);
+        const aiSummarizer = safeResolve<AISummarizer>(TOKENS.AISummarizer);
+        const contentScraper = safeResolve<ContentScraper>(
+          TOKENS.ContentScraper
+        );
+        const notifier = safeResolve<Notifier>(TOKENS.Notifier);
+        const backgroundTaskRunner = safeResolve<BackgroundTaskRunner>(
           TOKENS.BackgroundTaskRunner
-        ) as any;
+        );
         return new LinkManagementService(
           linkRepository,
           aiSummarizer,
@@ -194,8 +190,6 @@ function createCloudflareServiceConfig(
           backgroundTaskRunner
         );
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     // API Controllers
     {
@@ -204,13 +198,11 @@ function createCloudflareServiceConfig(
         const { LinkController } = await import(
           "../../web/api/controllers/link-controller.js"
         );
-        const linkManagementService = container.resolve(
+        const linkManagementService = safeResolve<any>(
           TOKENS.LinkManagementService
-        ) as any;
+        );
         return new LinkController(linkManagementService);
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.ConfigController,
@@ -220,8 +212,6 @@ function createCloudflareServiceConfig(
         );
         return new ConfigController();
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.PreviewController,
@@ -231,8 +221,6 @@ function createCloudflareServiceConfig(
         );
         return new PreviewController();
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.ApiRouter,
@@ -240,8 +228,6 @@ function createCloudflareServiceConfig(
         const { ApiRouter } = await import("../../web/api/api-router.js");
         return new ApiRouter();
       },
-      isDirectInstance: true,
-      factory: () => {}, // 사용되지 않음
     },
   ];
 }
