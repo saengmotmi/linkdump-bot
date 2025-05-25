@@ -1,4 +1,5 @@
-import { Link, LinkStatus } from "./link.js";
+import { Link } from "./link.js";
+import { LinkStatus } from "../../shared/interfaces/index.js";
 
 /**
  * 링크 저장소 인터페이스

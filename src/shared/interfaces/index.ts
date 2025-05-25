@@ -2,7 +2,10 @@
  * 핵심 도메인 인터페이스들
  */
 
-import { LinkStatus } from "../../link-management/domain/link.js";
+/**
+ * 링크 상태 타입
+ */
+export type LinkStatus = "pending" | "processing" | "completed" | "failed";
 
 export interface LinkData {
   id: string;
