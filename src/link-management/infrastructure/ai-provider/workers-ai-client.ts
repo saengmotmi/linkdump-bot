@@ -15,11 +15,11 @@ interface WorkersAIResponse {
  */
 export class WorkersAIClient implements AIClient {
   private ai: Ai; // Cloudflare AI binding
-  private defaultModel: "@cf/meta/llama-2-7b-chat-int8";
+  private defaultModel: string;
 
   constructor(
     aiBinding: Ai,
-    defaultModel: "@cf/meta/llama-2-7b-chat-int8" = "@cf/meta/llama-2-7b-chat-int8"
+    defaultModel: string = "@cf/meta/llama-2-7b-chat-int8"
   ) {
     this.ai = aiBinding;
     this.defaultModel = defaultModel;
@@ -30,13 +30,13 @@ export class WorkersAIClient implements AIClient {
    */
   async generateText(prompt: string, options: AIOptions = {}): Promise<string> {
     try {
-      const response = await this.ai.run(this.defaultModel, {
+      const response = await this.ai.run(this.defaultModel as any, {
         prompt,
         max_tokens: options.maxTokens || 512,
         temperature: options.temperature || 0.7,
       });
 
-      return this.parseResponse(response);
+      return this.parseResponse(response as AiTextGenerationOutput);
     } catch (error) {
       console.error("AI 텍스트 생성 실패:", error);
       throw new Error("AI 텍스트 생성에 실패했습니다.");

@@ -63,45 +63,43 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.AIClient,
-      importFn: () => {
+      importFn: async () => {
         // Claude API 키가 있으면 Claude 사용, 없으면 Workers AI 사용
         if (env.CLAUDE_API_KEY) {
-          return import("../infrastructure/ai-provider/claude-ai-client.js");
+          const { ClaudeAIClient } = await import(
+            "../infrastructure/ai-provider/claude-ai-client.js"
+          );
+          return new ClaudeAIClient(env.CLAUDE_API_KEY);
         } else {
-          return import("../infrastructure/ai-provider/workers-ai-client.js");
+          const { WorkersAIClient } = await import(
+            "../infrastructure/ai-provider/workers-ai-client.js"
+          );
+          return new WorkersAIClient(env.WORKERS_AI);
         }
       },
-      class: env.CLAUDE_API_KEY ? "ClaudeAIClient" : "WorkersAIClient",
-      factory: (deps: ServiceDependencies) => {
-        if (env.CLAUDE_API_KEY) {
-          return new deps.ClaudeAIClient(env.CLAUDE_API_KEY);
-        } else {
-          return new deps.WorkersAIClient(env.AI);
-        }
-      },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.AISummarizer,
-      importFn: () => {
+      importFn: async () => {
         // Claude API 키가 있으면 Claude 요약기 사용, 없으면 Workers AI 요약기 사용
         if (env.CLAUDE_API_KEY) {
-          return import(
+          const { ClaudeAISummarizer } = await import(
             "../infrastructure/ai-summarizer/claude-ai-summarizer.js"
           );
+          const aiClient = container.resolve(TOKENS.AIClient) as any;
+          return new ClaudeAISummarizer(aiClient);
         } else {
-          return import(
+          const { WorkersAISummarizer } = await import(
             "../infrastructure/ai-summarizer/workers-ai-summarizer.js"
           );
+          const aiClient = container.resolve(TOKENS.AIClient) as any;
+          return new WorkersAISummarizer(aiClient);
         }
       },
-      class: env.CLAUDE_API_KEY ? "ClaudeAISummarizer" : "WorkersAISummarizer",
-      factory: (deps: ServiceDependencies) => {
-        if (env.CLAUDE_API_KEY) {
-          return new deps.ClaudeAISummarizer(deps.resolve(TOKENS.AIClient));
-        } else {
-          return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
-        }
-      },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.ContentScraper,

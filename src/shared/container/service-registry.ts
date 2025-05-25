@@ -21,9 +21,11 @@ export type ServiceDependencies = {
 
 export interface ServiceConfig {
   token: symbol;
-  importFn?: () => Promise<any>; // 문자열 대신 함수로 변경
+  importFn?: () => Promise<any>; // 모듈 또는 인스턴스를 반환
   class?: string;
   factory: (deps: ServiceDependencies) => any;
+  // 새로운 방식: importFn이 인스턴스를 직접 반환하는 경우
+  isDirectInstance?: boolean;
 }
 
 /**
@@ -61,7 +63,16 @@ export async function registerServices(
   deps: ServiceDependencies
 ): Promise<void> {
   for (const service of serviceConfig) {
-    const instance = await service.factory(deps);
+    let instance;
+
+    if (service.isDirectInstance && service.importFn) {
+      // importFn이 인스턴스를 직접 반환하는 경우
+      instance = await service.importFn();
+    } else {
+      // 기존 방식: factory 함수 사용
+      instance = await service.factory(deps);
+    }
+
     container.registerInstance(service.token, instance);
   }
 }
