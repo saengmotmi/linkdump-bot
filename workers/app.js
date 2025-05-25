@@ -4,229 +4,427 @@ import { createCloudflareContainer } from "../src/shared/plugins/cloudflare-plug
 export default {
   async fetch(request, env, ctx) {
     try {
-      // 플러그인 기반 의존성 컨테이너 생성
+      // 플러그인 기반 DependencyContainer 생성
       const container = await createCloudflareContainer(env, ctx);
-      const linkManagementService = await container.resolve(
-        "linkManagementService"
-      );
+
+      // 런타임 서비스로 기본 요청 처리
+      const runtime = await container.resolve("runtime");
+      const { corsHeaders } = await runtime.handleRequest(request, {});
+
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 200,
+          headers: corsHeaders,
+        });
+      }
 
       const url = new URL(request.url);
-      const path = url.pathname;
-      const method = request.method;
-
-      // CORS 헤더 설정
-      const corsHeaders = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      };
-
-      // OPTIONS 요청 처리 (CORS preflight)
-      if (method === "OPTIONS") {
-        return new Response(null, { headers: corsHeaders });
-      }
 
       // API 라우팅
-      if (path.startsWith("/api/")) {
-        let response;
-
-        switch (true) {
-          case path === "/api/links" && method === "POST":
-            response = await handleAddLink(request, linkManagementService);
-            break;
-
-          case path === "/api/links" && method === "GET":
-            response = await handleGetLinks(linkManagementService);
-            break;
-
-          case path === "/api/process" && method === "POST":
-            response = await handleProcessLinks(linkManagementService);
-            break;
-
-          case path === "/api/statistics" && method === "GET":
-            response = await handleGetStatistics(linkManagementService);
-            break;
-
-          case path.match(/^\/api\/links\/(.+)$/) && method === "DELETE":
-            const deleteId = path.match(/^\/api\/links\/(.+)$/)[1];
-            response = await handleDeleteLink(deleteId, linkManagementService);
-            break;
-
-          case path.match(/^\/api\/links\/(.+)\/reprocess$/) &&
-            method === "POST":
-            const reprocessId = path.match(
-              /^\/api\/links\/(.+)\/reprocess$/
-            )[1];
-            response = await handleReprocessLink(
-              reprocessId,
-              linkManagementService
-            );
-            break;
-
-          case path.match(/^\/api\/links\/(.+)\/tags$/) && method === "POST":
-            const tagId = path.match(/^\/api\/links\/(.+)\/tags$/)[1];
-            response = await handleAddTags(
-              request,
-              tagId,
-              linkManagementService
-            );
-            break;
-
-          default:
-            response = new Response(
-              JSON.stringify({ error: "API 엔드포인트를 찾을 수 없습니다" }),
-              { status: 404, headers: { "Content-Type": "application/json" } }
-            );
-        }
-
-        // CORS 헤더 추가
-        Object.entries(corsHeaders).forEach(([key, value]) => {
-          response.headers.set(key, value);
-        });
-
-        return response;
+      if (url.pathname === "/api/add-link" && request.method === "POST") {
+        return await handleAddLink(request, container, corsHeaders);
       }
 
-      // 정적 파일 또는 기본 응답
-      return new Response("LinkDump Bot API", {
-        headers: { "Content-Type": "text/plain", ...corsHeaders },
-      });
+      if (url.pathname === "/api/process-links" && request.method === "POST") {
+        return await handleProcessLinks(container, corsHeaders);
+      }
+
+      if (url.pathname === "/api/config" && request.method === "GET") {
+        return await handleGetConfig(container, corsHeaders);
+      }
+
+      // 웹페이지 제공
+      if (request.method === "GET") {
+        return new Response(getWebPage(url), {
+          headers: {
+            "Content-Type": "text/html;charset=UTF-8",
+            ...corsHeaders,
+          },
+        });
+      }
+
+      return new Response("Not Found", { status: 404, headers: corsHeaders });
     } catch (error) {
-      console.error("애플리케이션 오류:", error);
+      console.error("Request handling failed:", error);
+
       return new Response(
         JSON.stringify({
-          error: "내부 서버 오류",
-          message: error.message,
+          error: "Internal server error",
+          details: error.message,
         }),
         {
           status: 500,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
         }
       );
     }
   },
 };
 
-// API 핸들러 함수들
-async function handleAddLink(request, linkManagementService) {
+// 링크 추가 핸들러
+async function handleAddLink(request, container, corsHeaders) {
   try {
-    const { url, tags } = await request.json();
+    const { url, tags = [] } = await request.json();
 
-    if (!url) {
-      return new Response(JSON.stringify({ error: "URL이 필요합니다" }), {
+    const linkService = await container.resolve("linkManagementService");
+    const runtime = await container.resolve("runtime");
+
+    // 링크 추가
+    const newLink = await linkService.addLink(url, tags);
+
+    // 백그라운드에서 링크 처리
+    runtime.scheduleBackgroundTask(async () => {
+      try {
+        const processedLink = await linkService.processLink(newLink);
+        await linkService.sendToDiscord(processedLink);
+      } catch (error) {
+        runtime.log("error", "Background processing failed", {
+          linkId: newLink.id,
+          error: error.message,
+        });
+      }
+    });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Link added successfully",
+        link: newLink,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    const runtime = await container.resolve("runtime");
+    runtime.log("error", "Add link failed", { error: error.message });
+
+    return new Response(
+      JSON.stringify({
+        error: "Failed to add link",
+        details: error.message,
+      }),
+      {
         status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+}
+
+// 링크 처리 핸들러
+async function handleProcessLinks(container, corsHeaders) {
+  try {
+    const linkService = await container.resolve("linkManagementService");
+    const result = await linkService.processAllUnprocessedLinks();
+
+    // 처리된 링크들을 Discord로 전송
+    for (const link of result.links) {
+      try {
+        await linkService.sendToDiscord(link);
+      } catch (error) {
+        // Discord 전송 실패는 전체 처리를 중단하지 않음
+        console.error("Discord send failed:", error);
+      }
     }
 
-    const result = await linkManagementService.addLink(url, tags);
-    return new Response(JSON.stringify(result), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("링크 추가 오류:", error);
     return new Response(
-      JSON.stringify({ error: "링크 추가 실패", message: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      JSON.stringify({
+        success: true,
+        message: `Processed ${result.processedCount} links`,
+        details: result,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: "Failed to process links",
+        details: error.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 }
 
-async function handleGetLinks(linkManagementService) {
+// 설정 정보 조회 핸들러
+async function handleGetConfig(container, corsHeaders) {
   try {
-    const links = await linkManagementService.getAllLinks();
-    return new Response(JSON.stringify({ links }), {
-      headers: { "Content-Type": "application/json" },
+    const aiClient = await container.resolve("aiClient");
+    const runtime = await container.resolve("runtime");
+
+    const config = {
+      ai: aiClient.getProviderInfo
+        ? aiClient.getProviderInfo()
+        : { provider: "unknown" },
+      runtime: runtime.getRuntimeInfo(),
+      availableModels: aiClient.getAvailableModels
+        ? await aiClient.getAvailableModels()
+        : [],
+    };
+
+    return new Response(JSON.stringify(config, null, 2), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("링크 조회 오류:", error);
     return new Response(
-      JSON.stringify({ error: "링크 조회 실패", message: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      JSON.stringify({
+        error: "Failed to get config",
+        details: error.message,
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 }
 
-async function handleProcessLinks(linkManagementService) {
-  try {
-    const result = await linkManagementService.processAllPendingLinks();
-    return new Response(JSON.stringify(result), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("링크 처리 오류:", error);
-    return new Response(
-      JSON.stringify({ error: "링크 처리 실패", message: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
-}
+// 웹페이지 HTML
+function getWebPage(url) {
+  const workerUrl = url.origin;
 
-async function handleGetStatistics(linkManagementService) {
-  try {
-    const stats = await linkManagementService.getStatistics();
-    return new Response(JSON.stringify(stats), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("통계 조회 오류:", error);
-    return new Response(
-      JSON.stringify({ error: "통계 조회 실패", message: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
-}
+  return `<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>링크 추가 - LinkDump Bot (Plugin-based)</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif; 
+            max-width: 600px; 
+            margin: 50px auto; 
+            padding: 20px;
+            line-height: 1.6;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { 
+            color: #333; 
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+        input[type="url"], input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input[type="url"]:focus, input[type="text"]:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .actions {
+            margin-top: 30px;
+            text-align: center;
+        }
+        .actions button {
+            width: auto;
+            margin: 0 10px;
+        }
+        .badge {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 LinkDump Bot</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            <span class="badge">Plugin-based Architecture</span>
+        </p>
+        
+        <form id="linkForm">
+            <div class="form-group">
+                <label for="url">URL:</label>
+                <input type="url" id="url" name="url" required 
+                       placeholder="https://example.com/article">
+            </div>
+            
+            <div class="form-group">
+                <label for="tags">태그 (쉼표로 구분):</label>
+                <input type="text" id="tags" name="tags" 
+                       placeholder="javascript, tutorial, react">
+            </div>
+            
+            <button type="submit" id="submitBtn">링크 추가</button>
+        </form>
+        
+        <div id="result" class="result"></div>
+        
+        <div class="actions">
+            <button onclick="processLinks()">미처리 링크 처리</button>
+            <button onclick="showConfig()">설정 보기</button>
+        </div>
+    </div>
 
-async function handleDeleteLink(id, linkManagementService) {
-  try {
-    const result = await linkManagementService.deleteLink(id);
-    return new Response(JSON.stringify(result), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("링크 삭제 오류:", error);
-    return new Response(
-      JSON.stringify({ error: "링크 삭제 실패", message: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
-}
-
-async function handleReprocessLink(id, linkManagementService) {
-  try {
-    const result = await linkManagementService.reprocessLink(id);
-    return new Response(JSON.stringify(result), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("링크 재처리 오류:", error);
-    return new Response(
-      JSON.stringify({ error: "링크 재처리 실패", message: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
-}
-
-async function handleAddTags(request, id, linkManagementService) {
-  try {
-    const { tags } = await request.json();
-
-    if (!tags || !Array.isArray(tags)) {
-      return new Response(JSON.stringify({ error: "태그 배열이 필요합니다" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const result = await linkManagementService.addTagsToLink(id, tags);
-    return new Response(JSON.stringify(result), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    console.error("태그 추가 오류:", error);
-    return new Response(
-      JSON.stringify({ error: "태그 추가 실패", message: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
+    <script>
+        document.getElementById('linkForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const result = document.getElementById('result');
+            const url = document.getElementById('url').value;
+            const tags = document.getElementById('tags').value
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(tag => tag);
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = '처리 중...';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('${workerUrl}/api/add-link', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url, tags })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.innerHTML = \`
+                        <strong>✅ 성공!</strong><br>
+                        링크가 추가되었습니다: \${data.link.url}<br>
+                        ID: \${data.link.id}
+                    \`;
+                    document.getElementById('linkForm').reset();
+                } else {
+                    throw new Error(data.error || '알 수 없는 오류');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = \`<strong>❌ 오류:</strong> \${error.message}\`;
+            }
+            
+            result.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = '링크 추가';
+        });
+        
+        async function processLinks() {
+            const result = document.getElementById('result');
+            
+            try {
+                const response = await fetch('${workerUrl}/api/process-links', {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.innerHTML = \`
+                        <strong>✅ 처리 완료!</strong><br>
+                        \${data.message}
+                    \`;
+                } else {
+                    throw new Error(data.error || '처리 실패');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = \`<strong>❌ 오류:</strong> \${error.message}\`;
+            }
+            
+            result.style.display = 'block';
+        }
+        
+        async function showConfig() {
+            const result = document.getElementById('result');
+            
+            try {
+                const response = await fetch('${workerUrl}/api/config');
+                const config = await response.json();
+                
+                if (response.ok) {
+                    result.className = 'result success';
+                    result.innerHTML = \`
+                        <strong>⚙️ 현재 설정:</strong><br>
+                        <pre style="margin-top: 10px; font-size: 12px;">\${JSON.stringify(config, null, 2)}</pre>
+                    \`;
+                } else {
+                    throw new Error(config.error || '설정 조회 실패');
+                }
+            } catch (error) {
+                result.className = 'result error';
+                result.innerHTML = \`<strong>❌ 오류:</strong> \${error.message}\`;
+            }
+            
+            result.style.display = 'block';
+        }
+    </script>
+</body>
+</html>`;
 }
