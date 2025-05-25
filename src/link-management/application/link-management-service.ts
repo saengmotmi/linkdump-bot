@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { injectable, inject } from "tsyringe";
-import { LinkDomainService } from "../domain/link-service";
-import { LinkRepository } from "../domain/link-repository";
+import { LinkDomainService } from "../domain/link-service.js";
+import { LinkRepository } from "../domain/link-repository.js";
 import {
   ContentScraper,
   AISummarizer,

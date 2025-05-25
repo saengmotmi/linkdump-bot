@@ -1,60 +1,41 @@
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type {
-  Storage,
-  AIClient,
-  AISummarizer,
-  ContentScraper,
-  Notifier,
-  BackgroundTaskRunner,
-} from "../interfaces/index.js";
+import type { AISummarizer, Storage } from "../interfaces/index.js";
 import { TOKENS } from "../interfaces/index.js";
 
 /**
  * Cloudflare Workers 환경 컨테이너 설정
  */
 export async function setupCloudflareContainer(env: any, ctx?: any) {
-  // 스토리지 등록
-  if (env.R2_BUCKET) {
-    // R2 스토리지 사용
-    const { R2Storage } = await import(
-      "../../link-management/infrastructure/storage/r2-storage.js"
-    );
-    container.registerInstance("R2_BUCKET", env.R2_BUCKET);
-    container.register<Storage>(TOKENS.Storage, { useClass: R2Storage });
-  } else {
-    // 파일 스토리지 폴백
-    const { FileStorage } = await import(
-      "../../link-management/infrastructure/storage/file-storage.js"
-    );
-    container.register<Storage>(TOKENS.Storage, { useClass: FileStorage });
-  }
+  // R2 스토리지 등록 (우선순위)
+  container.register(TOKENS.Storage, {
+    useFactory: async () => {
+      const { R2Storage } = await import(
+        "../../link-management/infrastructure/storage/r2-storage.js"
+      );
+      return new R2Storage(env.BUCKET);
+    },
+  });
 
-  // AI 클라이언트 등록
-  if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN) {
-    // Workers AI 사용
-    const { WorkersAIClient } = await import(
-      "../../link-management/infrastructure/ai-provider/workers-ai-client.js"
-    );
-    container.registerInstance(
-      "CLOUDFLARE_ACCOUNT_ID",
-      env.CLOUDFLARE_ACCOUNT_ID
-    );
-    container.registerInstance(
-      "CLOUDFLARE_API_TOKEN",
-      env.CLOUDFLARE_API_TOKEN
-    );
-    container.register<AIClient>(TOKENS.AIClient, {
-      useClass: WorkersAIClient,
-    });
-  } else if (env.OPENAI_API_KEY) {
-    // OpenAI 사용
-    const { OpenAIClient } = await import(
-      "../../link-management/infrastructure/ai-provider/openai-client.js"
-    );
-    container.registerInstance("OPENAI_API_KEY", env.OPENAI_API_KEY);
-    container.register<AIClient>(TOKENS.AIClient, { useClass: OpenAIClient });
-  }
+  // 파일 스토리지 등록 (폴백)
+  container.register("FileStorage", {
+    useFactory: async () => {
+      const { FileStorage } = await import(
+        "../../link-management/infrastructure/storage/file-storage.js"
+      );
+      return new FileStorage("./data");
+    },
+  });
+
+  // Workers AI 클라이언트 등록 (우선순위)
+  container.register(TOKENS.AIClient, {
+    useFactory: async () => {
+      const { WorkersAIClient } = await import(
+        "../../link-management/infrastructure/ai-provider/workers-ai-client.js"
+      );
+      return new WorkersAIClient(env.AI);
+    },
+  });
 
   // AI 요약기 등록
   if (env.CLOUDFLARE_ACCOUNT_ID && env.CLOUDFLARE_API_TOKEN) {
@@ -76,35 +57,44 @@ export async function setupCloudflareContainer(env: any, ctx?: any) {
   }
 
   // 콘텐츠 스크래퍼 등록
-  const { WebContentScraper } = await import(
-    "../../link-management/infrastructure/content-scraper/web-scraper.js"
-  );
-  container.register<ContentScraper>(TOKENS.ContentScraper, {
-    useClass: WebContentScraper,
+  container.register(TOKENS.ContentScraper, {
+    useFactory: async () => {
+      const { WebContentScraper } = await import(
+        "../../link-management/infrastructure/content-scraper/web-scraper.js"
+      );
+      return new WebContentScraper();
+    },
   });
 
   // 알림기 등록
-  const { DiscordNotifier } = await import(
-    "../../link-management/infrastructure/notification/discord-notifier.js"
-  );
-  const webhooks = env.DISCORD_WEBHOOKS ? env.DISCORD_WEBHOOKS.split(",") : [];
-  container.registerInstance("DISCORD_WEBHOOKS", webhooks);
-  container.register<Notifier>(TOKENS.Notifier, { useClass: DiscordNotifier });
-
-  // 백그라운드 태스크 러너 등록
-  const { WorkersBackgroundRunner } = await import(
-    "../../link-management/infrastructure/background-task/workers-background-runner.js"
-  );
-  container.registerInstance("WORKERS_RUNTIME", { env, ctx });
-  container.register<BackgroundTaskRunner>(TOKENS.BackgroundTaskRunner, {
-    useClass: WorkersBackgroundRunner,
+  container.register(TOKENS.Notifier, {
+    useFactory: async () => {
+      const { DiscordNotifier } = await import(
+        "../../link-management/infrastructure/notification/discord-notifier.js"
+      );
+      return new DiscordNotifier(env.DISCORD_WEBHOOKS?.split(",") || []);
+    },
   });
 
-  // 런타임 등록
-  const { WorkersRuntime } = await import(
-    "../../link-management/infrastructure/runtime/workers-runtime.js"
-  );
-  container.registerInstance(TOKENS.Runtime, new WorkersRuntime(env, ctx));
+  // Workers 백그라운드 러너 등록
+  container.register(TOKENS.BackgroundTaskRunner, {
+    useFactory: async () => {
+      const { WorkersBackgroundRunner } = await import(
+        "../../link-management/infrastructure/background-task/workers-background-runner.js"
+      );
+      return new WorkersBackgroundRunner({ env, ctx });
+    },
+  });
+
+  // Workers 런타임 등록
+  container.register(TOKENS.Runtime, {
+    useFactory: async () => {
+      const { WorkersRuntime } = await import(
+        "../../link-management/infrastructure/runtime/workers-runtime.js"
+      );
+      return new WorkersRuntime(env, ctx);
+    },
+  });
 
   // 링크 저장소 등록
   const { StorageLinkRepository } = await import(

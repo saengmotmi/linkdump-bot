@@ -1,5 +1,5 @@
-import { Link, LinkStatus, LinkProcessingData } from "./link";
-import { LinkRepository } from "./link-repository";
+import { Link, LinkStatus, LinkProcessingData } from "./link.js";
+import { LinkRepository } from "./link-repository.js";
 import { ContentScraper, AISummarizer } from "../../shared/interfaces/index.js";
 
 /**

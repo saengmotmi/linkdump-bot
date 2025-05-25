@@ -1,5 +1,5 @@
-import { LinkRepository } from "../domain/link-repository";
-import { Link, LinkStatus } from "../domain/link";
+import { LinkRepository } from "../domain/link-repository.js";
+import { Link, LinkStatus } from "../domain/link.js";
 import { Storage } from "../../shared/interfaces/index.js";
 
 /**
