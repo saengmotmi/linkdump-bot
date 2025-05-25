@@ -1,30 +1,8 @@
 import type { Notifier, LinkData } from "../../../shared/interfaces/index.js";
-
-interface DiscordEmbed {
-  title?: string;
-  description?: string;
-  url?: string;
-  color?: number;
-  fields?: Array<{
-    name: string;
-    value: string;
-    inline?: boolean;
-  }>;
-  timestamp?: Date | string;
-  footer?: {
-    text: string;
-  };
-  image?: {
-    url: string;
-  };
-  thumbnail?: {
-    url: string;
-  };
-}
-
-interface DiscordPayload {
-  embeds: DiscordEmbed[];
-}
+import type {
+  DiscordEmbed,
+  DiscordWebhookPayload,
+} from "../../../shared/types/discord.js";
 
 /**
  * Discord 웹훅 알림 구현체
@@ -46,7 +24,7 @@ export class DiscordNotifier implements Notifier {
     }
 
     const embed = this.createEmbed(linkData);
-    const payload: DiscordPayload = { embeds: [embed] };
+    const payload: DiscordWebhookPayload = { embeds: [embed] };
 
     const results = await Promise.allSettled(
       this.webhookUrls.map((webhook) => this.sendToWebhook(webhook, payload))
@@ -88,7 +66,7 @@ export class DiscordNotifier implements Notifier {
           inline: true,
         },
       ],
-      timestamp: linkData.createdAt,
+      timestamp: linkData.createdAt.toISOString(),
       footer: {
         text: "LinkDump Bot",
       },
@@ -100,7 +78,7 @@ export class DiscordNotifier implements Notifier {
    */
   private async sendToWebhook(
     webhookUrl: string,
-    payload: DiscordPayload
+    payload: DiscordWebhookPayload
   ): Promise<Response> {
     const response = await fetch(webhookUrl, {
       method: "POST",

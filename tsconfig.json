@@ -12,7 +12,11 @@
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "outDir": "./dist",
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "typeRoots": [
+      "./node_modules/@types",
+      "./node_modules/@cloudflare/workers-types",
+      "./src/types"
+    ]
   },
   "include": ["src/**/*", "workers/**/*"],
   "exclude": ["node_modules", "dist"]

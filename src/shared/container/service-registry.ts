@@ -1,10 +1,17 @@
 import { container } from "tsyringe";
 
+// 서비스 의존성 타입 정의
+export type ServiceDependencies = {
+  resolve<T = unknown>(token: symbol): T;
+} & {
+  [className: string]: new (...args: any[]) => any; // 동적으로 로드되는 클래스들
+};
+
 export interface ServiceConfig {
   token: symbol;
   import?: string;
   class?: string;
-  factory: (deps: any) => any;
+  factory: (deps: ServiceDependencies) => any;
 }
 
 /**
@@ -12,7 +19,7 @@ export interface ServiceConfig {
  */
 export async function loadDependencies(
   serviceConfig: ServiceConfig[]
-): Promise<Record<string, any>> {
+): Promise<Record<string, new (...args: any[]) => any>> {
   // 의존성 로드
   const imports = await Promise.all(
     serviceConfig
@@ -21,7 +28,7 @@ export async function loadDependencies(
   );
 
   // 클래스 매핑
-  const classes: Record<string, any> = {};
+  const classes: Record<string, new (...args: any[]) => any> = {};
   serviceConfig.forEach((service, index) => {
     if (service.class && service.import) {
       const importIndex = serviceConfig
@@ -39,7 +46,7 @@ export async function loadDependencies(
  */
 export async function registerServices(
   serviceConfig: ServiceConfig[],
-  deps: any
+  deps: ServiceDependencies
 ): Promise<void> {
   for (const service of serviceConfig) {
     const instance = await service.factory(deps);
@@ -58,13 +65,12 @@ export async function setupContainer(
   const classes = await loadDependencies(serviceConfig);
 
   // 의존성 컨텍스트 준비
-  const deps = {
-    container,
+  const deps: ServiceDependencies = {
     ...classes,
     ...additionalDeps,
     // 동적 인스턴스 해결을 위한 헬퍼
-    resolve: (token: symbol) => container.resolve(token),
-  };
+    resolve: <T = unknown>(token: symbol): T => container.resolve<T>(token),
+  } as ServiceDependencies;
 
   // 서비스 등록
   await registerServices(serviceConfig, deps);

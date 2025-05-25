@@ -2,7 +2,11 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import type { Config } from "../interfaces/index.js";
 import { TOKENS } from "../interfaces/index.js";
-import { setupContainer, type ServiceConfig } from "./service-registry.js";
+import {
+  setupContainer,
+  type ServiceConfig,
+  type ServiceDependencies,
+} from "./service-registry.js";
 
 /**
  * 로컬 개발 환경 서비스 설정 정의
@@ -26,8 +30,8 @@ function createLocalServiceConfig(
       token: TOKENS.Storage,
       import: "../../link-management/infrastructure/storage/file-storage.js",
       class: "FileStorage",
-      factory: (deps: any) => {
-        const config = deps.resolve(TOKENS.Config);
+      factory: (deps: ServiceDependencies) => {
+        const config = deps.resolve<Config>(TOKENS.Config);
         return new deps.FileStorage(config.dataPath || "./data");
       },
     },
@@ -35,18 +39,19 @@ function createLocalServiceConfig(
       token: TOKENS.LinkRepository,
       import: "../../link-management/infrastructure/storage-link-repository.js",
       class: "StorageLinkRepository",
-      factory: (deps: any) =>
-        new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage)),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
+      },
     },
     {
       token: TOKENS.AIClient,
       import:
         "../../link-management/infrastructure/ai-provider/workers-ai-client.js",
       class: "WorkersAIClient",
-      factory: (deps: any) => {
+      factory: (deps: ServiceDependencies) => {
         // 로컬 환경에서는 mock AI binding 사용
         const mockAI = {
-          run: async (model: string, options: any) => {
+          run: async (model: string, options: Record<string, unknown>) => {
             return { response: "Mock AI response for local development" };
           },
         };
@@ -58,23 +63,26 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js",
       class: "WorkersAISummarizer",
-      factory: (deps: any) =>
-        new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient)),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
+      },
     },
     {
       token: TOKENS.ContentScraper,
       import:
         "../../link-management/infrastructure/content-scraper/web-scraper.js",
       class: "WebContentScraper",
-      factory: (deps: any) => new deps.WebContentScraper(),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WebContentScraper();
+      },
     },
     {
       token: TOKENS.Notifier,
       import:
         "../../link-management/infrastructure/notification/discord-notifier.js",
       class: "DiscordNotifier",
-      factory: (deps: any) => {
-        const config = deps.resolve(TOKENS.Config);
+      factory: (deps: ServiceDependencies) => {
+        const config = deps.resolve<Config>(TOKENS.Config);
         return new deps.DiscordNotifier(config.webhookUrls || []);
       },
     },
@@ -83,7 +91,9 @@ function createLocalServiceConfig(
       import:
         "../../link-management/infrastructure/background-task/local-background-runner.js",
       class: "LocalBackgroundRunner",
-      factory: (deps: any) => new deps.LocalBackgroundRunner(),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.LocalBackgroundRunner();
+      },
     },
   ];
 }

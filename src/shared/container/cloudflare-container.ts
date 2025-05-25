@@ -2,12 +2,27 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import type { Config } from "../interfaces/index.js";
 import { TOKENS } from "../interfaces/index.js";
-import { setupContainer, type ServiceConfig } from "./service-registry.js";
+import {
+  setupContainer,
+  type ServiceConfig,
+  type ServiceDependencies,
+} from "./service-registry.js";
+
+// Cloudflare Workers 환경 타입 정의
+interface CloudflareEnv {
+  LINKDUMP_STORAGE: R2Bucket;
+  AI: Ai;
+  DISCORD_WEBHOOKS?: string;
+  OPENAI_API_KEY?: string;
+}
 
 /**
  * Cloudflare Workers 서비스 설정 정의
  */
-function createCloudflareServiceConfig(env: any, ctx?: any): ServiceConfig[] {
+function createCloudflareServiceConfig(
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
+): ServiceConfig[] {
   return [
     // 설정 객체 - 환경별 설정값만 포함
     {
@@ -24,44 +39,52 @@ function createCloudflareServiceConfig(env: any, ctx?: any): ServiceConfig[] {
       token: TOKENS.Storage,
       import: "../../link-management/infrastructure/storage/r2-storage.js",
       class: "R2Storage",
-      factory: (deps: any) => new deps.R2Storage(env.LINKDUMP_R2_STORAGE),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.R2Storage(env.LINKDUMP_STORAGE);
+      },
     },
     {
       token: TOKENS.LinkRepository,
       import: "../../link-management/infrastructure/storage-link-repository.js",
       class: "StorageLinkRepository",
-      factory: (deps: any) =>
-        new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage)),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.StorageLinkRepository(deps.resolve(TOKENS.Storage));
+      },
     },
     {
       token: TOKENS.AIClient,
       import:
         "../../link-management/infrastructure/ai-provider/workers-ai-client.js",
       class: "WorkersAIClient",
-      factory: (deps: any) => new deps.WorkersAIClient(env.WORKERS_AI_MODEL),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WorkersAIClient(env.AI);
+      },
     },
     {
       token: TOKENS.AISummarizer,
       import:
         "../../link-management/infrastructure/ai-summarizer/workers-ai-summarizer.js",
       class: "WorkersAISummarizer",
-      factory: (deps: any) =>
-        new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient)),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
+      },
     },
     {
       token: TOKENS.ContentScraper,
       import:
         "../../link-management/infrastructure/content-scraper/web-scraper.js",
       class: "WebContentScraper",
-      factory: (deps: any) => new deps.WebContentScraper(),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WebContentScraper();
+      },
     },
     {
       token: TOKENS.Notifier,
       import:
         "../../link-management/infrastructure/notification/discord-notifier.js",
       class: "DiscordNotifier",
-      factory: (deps: any) => {
-        const config = deps.resolve(TOKENS.Config);
+      factory: (deps: ServiceDependencies) => {
+        const config = deps.resolve<Config>(TOKENS.Config);
         return new deps.DiscordNotifier(config.webhookUrls || []);
       },
     },
@@ -70,7 +93,9 @@ function createCloudflareServiceConfig(env: any, ctx?: any): ServiceConfig[] {
       import:
         "../../link-management/infrastructure/background-task/workers-background-runner.js",
       class: "WorkersBackgroundRunner",
-      factory: (deps: any) => new deps.WorkersBackgroundRunner({ env, ctx }),
+      factory: (deps: ServiceDependencies) => {
+        return new deps.WorkersBackgroundRunner({ env, ctx });
+      },
     },
   ];
 }
@@ -78,7 +103,10 @@ function createCloudflareServiceConfig(env: any, ctx?: any): ServiceConfig[] {
 /**
  * Cloudflare Workers 환경 컨테이너 설정
  */
-export async function setupCloudflareContainer(env: any, ctx?: any) {
+export async function setupCloudflareContainer(
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
+) {
   // 서비스 설정 생성 (설정 객체 포함)
   const serviceConfig = createCloudflareServiceConfig(env, ctx);
 
@@ -91,7 +119,10 @@ export async function setupCloudflareContainer(env: any, ctx?: any) {
 /**
  * Cloudflare Workers 환경에서 컨테이너 생성
  */
-export async function createCloudflareContainer(env: any, ctx?: any) {
+export async function createCloudflareContainer(
+  env: CloudflareEnv,
+  ctx?: ExecutionContext
+) {
   // 새로운 자식 컨테이너 생성 (격리를 위해)
   const childContainer = container.createChildContainer();
 

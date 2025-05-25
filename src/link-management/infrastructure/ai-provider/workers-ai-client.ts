@@ -14,76 +14,70 @@ interface WorkersAIResponse {
  * Cloudflare Workers AI 클라이언트
  */
 export class WorkersAIClient implements AIClient {
-  private ai: any; // Cloudflare AI binding
-  private defaultModel: string;
+  private ai: Ai; // Cloudflare AI binding
+  private defaultModel: "@cf/meta/llama-2-7b-chat-int8";
 
   constructor(
-    aiBinding: any,
-    defaultModel: string = "@cf/meta/llama-3.2-1b-instruct"
+    aiBinding: Ai,
+    defaultModel: "@cf/meta/llama-2-7b-chat-int8" = "@cf/meta/llama-2-7b-chat-int8"
   ) {
     this.ai = aiBinding;
     this.defaultModel = defaultModel;
   }
 
   /**
-   * 텍스트 생성
+   * AI 모델을 사용하여 텍스트를 생성합니다.
    */
   async generateText(prompt: string, options: AIOptions = {}): Promise<string> {
-    const {
-      maxTokens = 150,
-      temperature = 0.7,
-      model = this.defaultModel,
-    } = options;
-
     try {
-      const response = await this.ai.run(model, {
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: maxTokens,
-        temperature,
+      const response = await this.ai.run(this.defaultModel, {
+        prompt,
+        max_tokens: options.maxTokens || 512,
+        temperature: options.temperature || 0.7,
       });
 
-      return this._parseResponse(response);
-    } catch (error: any) {
-      throw new Error(`Workers AI 생성 실패: ${error.message}`);
+      return this.parseResponse(response);
+    } catch (error) {
+      console.error("AI 텍스트 생성 실패:", error);
+      throw new Error("AI 텍스트 생성에 실패했습니다.");
     }
   }
 
   /**
-   * 채팅 완성
+   * AI 모델을 사용하여 텍스트를 요약합니다.
    */
-  async chatCompletion(
-    messages: WorkersAIMessage[],
-    options: AIOptions = {}
-  ): Promise<string> {
-    const {
-      maxTokens = 150,
-      temperature = 0.7,
-      model = this.defaultModel,
-    } = options;
+  async summarizeText(text: string, options: AIOptions = {}): Promise<string> {
+    const prompt = `다음 텍스트를 간결하게 요약해주세요:\n\n${text}`;
 
     try {
-      const response = await this.ai.run(model, {
-        messages,
-        max_tokens: maxTokens,
-        temperature,
+      const response = await this.ai.run(this.defaultModel, {
+        prompt,
+        max_tokens: options.maxTokens || 256,
+        temperature: options.temperature || 0.5,
       });
 
-      return this._parseResponse(response);
-    } catch (error: any) {
-      throw new Error(`Workers AI 채팅 완성 실패: ${error.message}`);
+      return this.parseResponse(response);
+    } catch (error) {
+      console.error("AI 텍스트 요약 실패:", error);
+      throw new Error("AI 텍스트 요약에 실패했습니다.");
     }
   }
 
   /**
-   * 응답 파싱
+   * AI 응답을 파싱합니다.
    */
-  private _parseResponse(response: WorkersAIResponse): string {
-    if (!response) {
-      throw new Error("Workers AI에서 빈 응답을 받았습니다");
+  private parseResponse(response: AiTextGenerationOutput): string {
+    if (typeof response === "string") {
+      return response;
     }
 
-    return (
-      response.response || response.result || "AI 요약을 생성할 수 없습니다."
-    );
+    if (response && typeof response === "object" && "response" in response) {
+      return (
+        (response as WorkersAIResponse).response ||
+        "AI 응답을 생성할 수 없습니다."
+      );
+    }
+
+    return String(response) || "AI 응답을 생성할 수 없습니다.";
   }
 }
