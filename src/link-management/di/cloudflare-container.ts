@@ -91,6 +91,8 @@ function createCloudflareServiceConfig(
           return new WorkersAIClient(env.WORKERS_AI);
         }
       },
+      isDirectInstance: true,
+      factory: () => {}, // 사용되지 않음
     },
     {
       token: TOKENS.AISummarizer,
