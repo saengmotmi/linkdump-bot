@@ -1,4 +1,4 @@
-const fs = require('fs');
+// R2용 링크 처리 로직 (파일 시스템 대신 메모리에서 작업)
 const axios = require('axios');
 const cheerio = require('cheerio');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -78,9 +78,7 @@ async function sendToDiscord(webhookUrl, linkData) {
   }
 }
 
-async function processNewLinks() {
-  const data = JSON.parse(fs.readFileSync('links.json', 'utf8'));
-  
+async function processNewLinks(linksData) {
   // Get Discord webhooks from environment variable
   const webhooks = process.env.DISCORD_WEBHOOKS ? 
     process.env.DISCORD_WEBHOOKS.split(',').map(w => w.trim()) : [];
@@ -89,7 +87,7 @@ async function processNewLinks() {
     console.warn('No Discord webhooks configured in DISCORD_WEBHOOKS environment variable');
   }
   
-  const unprocessedLinks = data.links.filter(link => !link.processed);
+  const unprocessedLinks = linksData.links.filter(link => !link.processed);
   
   for (const link of unprocessedLinks) {
     console.log(`Processing: ${link.url}`);
@@ -113,12 +111,8 @@ async function processNewLinks() {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
   
-  fs.writeFileSync('links.json', JSON.stringify(data, null, 2));
   console.log(`Processed ${unprocessedLinks.length} links`);
-}
-
-if (require.main === module) {
-  processNewLinks().catch(console.error);
+  return linksData;
 }
 
 module.exports = { processNewLinks };
