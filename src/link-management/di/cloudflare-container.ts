@@ -63,20 +63,44 @@ function createCloudflareServiceConfig(
     },
     {
       token: TOKENS.AIClient,
-      importFn: () =>
-        import("../infrastructure/ai-provider/workers-ai-client.js"),
-      class: "WorkersAIClient",
+      importFn: () => {
+        // Claude API 키가 있으면 Claude 사용, 없으면 Workers AI 사용
+        if (env.CLAUDE_API_KEY) {
+          return import("../infrastructure/ai-provider/claude-ai-client.js");
+        } else {
+          return import("../infrastructure/ai-provider/workers-ai-client.js");
+        }
+      },
+      class: env.CLAUDE_API_KEY ? "ClaudeAIClient" : "WorkersAIClient",
       factory: (deps: ServiceDependencies) => {
-        return new deps.WorkersAIClient(env.AI);
+        if (env.CLAUDE_API_KEY) {
+          return new deps.ClaudeAIClient(env.CLAUDE_API_KEY);
+        } else {
+          return new deps.WorkersAIClient(env.AI);
+        }
       },
     },
     {
       token: TOKENS.AISummarizer,
-      importFn: () =>
-        import("../infrastructure/ai-summarizer/workers-ai-summarizer.js"),
-      class: "WorkersAISummarizer",
+      importFn: () => {
+        // Claude API 키가 있으면 Claude 요약기 사용, 없으면 Workers AI 요약기 사용
+        if (env.CLAUDE_API_KEY) {
+          return import(
+            "../infrastructure/ai-summarizer/claude-ai-summarizer.js"
+          );
+        } else {
+          return import(
+            "../infrastructure/ai-summarizer/workers-ai-summarizer.js"
+          );
+        }
+      },
+      class: env.CLAUDE_API_KEY ? "ClaudeAISummarizer" : "WorkersAISummarizer",
       factory: (deps: ServiceDependencies) => {
-        return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
+        if (env.CLAUDE_API_KEY) {
+          return new deps.ClaudeAISummarizer(deps.resolve(TOKENS.AIClient));
+        } else {
+          return new deps.WorkersAISummarizer(deps.resolve(TOKENS.AIClient));
+        }
       },
     },
     {

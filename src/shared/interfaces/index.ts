@@ -27,6 +27,7 @@ export interface CloudflareEnv {
   AI: Ai;
   DISCORD_WEBHOOKS?: string;
   OPENAI_API_KEY?: string;
+  CLAUDE_API_KEY?: string;
   CF_PAGES?: string;
 }
 
