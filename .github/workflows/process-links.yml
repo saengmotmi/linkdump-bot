@@ -1,0 +1,38 @@
+name: Process New Links
+
+on:
+  push:
+    paths:
+      - 'links.json'
+  workflow_dispatch:
+
+jobs:
+  process-links:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm install
+      
+    - name: Process links
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        DISCORD_WEBHOOKS: ${{ secrets.DISCORD_WEBHOOKS }}
+      run: npm run process-links
+      
+    - name: Commit processed links
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add links.json
+        git diff --staged --quiet || git commit -m "🤖 Process new links and add summaries"
+        git push
