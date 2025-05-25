@@ -1,30 +1,43 @@
+import "reflect-metadata";
+import { injectable, inject } from "tsyringe";
 import { LinkDomainService } from "../domain/link-service.js";
+import {
+  LinkRepository,
+  ContentScraper,
+  AISummarizer,
+  Notifier,
+  BackgroundTaskRunner,
+  LinkData,
+  TOKENS,
+} from "../../shared/interfaces/index.js";
 
 /**
  * 링크 관리 애플리케이션 서비스
  * 도메인 서비스와 외부 서비스들을 조율하여 사용자 요청을 처리합니다.
  */
+@injectable()
 export class LinkManagementService {
+  private linkDomainService: LinkDomainService;
+
   constructor(
-    linkRepository,
-    contentScraper,
-    aiSummarizer,
-    discordNotifier,
-    backgroundTaskRunner
+    @inject(TOKENS.LinkRepository) linkRepository: LinkRepository,
+    @inject(TOKENS.ContentScraper) contentScraper: ContentScraper,
+    @inject(TOKENS.AISummarizer) aiSummarizer: AISummarizer,
+    @inject(TOKENS.Notifier) private discordNotifier: Notifier,
+    @inject(TOKENS.BackgroundTaskRunner)
+    private backgroundTaskRunner: BackgroundTaskRunner
   ) {
     this.linkDomainService = new LinkDomainService(
       linkRepository,
       contentScraper,
       aiSummarizer
     );
-    this.discordNotifier = discordNotifier;
-    this.backgroundTaskRunner = backgroundTaskRunner;
   }
 
   /**
    * 새 링크 추가 (사용자 요청)
    */
-  async addLink(url, tags = []) {
+  async addLink(url: string, tags: string[] = []) {
     try {
       // 도메인 서비스를 통해 링크 생성
       const newLink = await this.linkDomainService.createLink(url, tags);
@@ -50,7 +63,7 @@ export class LinkManagementService {
         link: newLink.toObject(),
         message: "링크가 추가되었습니다. 백그라운드에서 처리 중입니다.",
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         error: error.message,
@@ -87,7 +100,7 @@ export class LinkManagementService {
         failed: results.filter((r) => !r.success).length,
         results,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         error: error.message,
@@ -106,7 +119,7 @@ export class LinkManagementService {
         success: true,
         links: links.map((link) => link.toObject()),
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         error: error.message,
@@ -125,7 +138,7 @@ export class LinkManagementService {
         success: true,
         statistics: stats,
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         error: error.message,
@@ -136,7 +149,7 @@ export class LinkManagementService {
   /**
    * 특정 링크에 태그 추가
    */
-  async addTagsToLink(linkId, tags) {
+  async addTagsToLink(linkId: string, tags: string[]) {
     try {
       const updatedLink = await this.linkDomainService.addTagsToLink(
         linkId,
@@ -148,7 +161,7 @@ export class LinkManagementService {
         link: updatedLink.toObject(),
         message: "태그가 추가되었습니다.",
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         error: error.message,
@@ -159,7 +172,7 @@ export class LinkManagementService {
   /**
    * 링크 삭제
    */
-  async deleteLink(linkId) {
+  async deleteLink(linkId: string) {
     try {
       const deleted = await this.linkDomainService.linkRepository.delete(
         linkId
@@ -176,7 +189,7 @@ export class LinkManagementService {
           error: "링크를 찾을 수 없습니다.",
         };
       }
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         error: error.message,
@@ -187,7 +200,7 @@ export class LinkManagementService {
   /**
    * 특정 링크 재처리
    */
-  async reprocessLink(linkId) {
+  async reprocessLink(linkId: string) {
     try {
       const processedLink = await this.linkDomainService.processLink(linkId);
 
@@ -201,7 +214,7 @@ export class LinkManagementService {
         link: processedLink.toObject(),
         message: "링크가 재처리되었습니다.",
       };
-    } catch (error) {
+    } catch (error: any) {
       return {
         success: false,
         error: error.message,

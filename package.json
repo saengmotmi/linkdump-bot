@@ -12,7 +12,8 @@
   },
   "packageManager": "yarn@4.0.0",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20231218.0",
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "@types/node": "^22.15.21",
     "@vitest/coverage-v8": "^1.0.0",
     "vitest": "^1.0.0"
   },
@@ -28,5 +29,9 @@
     "interface-based"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "reflect-metadata": "^0.2.2",
+    "tsyringe": "^4.10.0"
+  }
 }
