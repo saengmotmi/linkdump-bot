@@ -17,21 +17,13 @@
 
 import "reflect-metadata";
 import { container } from "tsyringe";
-import type { Config } from "../../shared/interfaces/index.js";
+import type { Config, CloudflareEnv } from "../../shared/interfaces/index.js";
 import { TOKENS } from "../../shared/interfaces/index.js";
 import {
   setupContainer,
   type ServiceConfig,
   type ServiceDependencies,
 } from "../../shared/container/service-registry.js";
-
-// Cloudflare Workers 환경 타입 정의
-interface CloudflareEnv {
-  LINKDUMP_STORAGE: R2Bucket;
-  AI: Ai;
-  DISCORD_WEBHOOKS?: string;
-  OPENAI_API_KEY?: string;
-}
 
 /**
  * Cloudflare Workers 서비스 설정 정의
@@ -106,6 +98,24 @@ function createCloudflareServiceConfig(
       },
     },
     {
+      token: TOKENS.TaskQueue,
+      importFn: () => import("../../shared/queue/memory-task-queue.js"),
+      class: "MemoryTaskQueue",
+      factory: (deps: ServiceDependencies) => {
+        return new deps.MemoryTaskQueue();
+      },
+    },
+    {
+      token: TOKENS.QueueProcessor,
+      importFn: () =>
+        import("../../shared/queue/sequential-queue-processor.js"),
+      class: "SequentialQueueProcessor",
+      factory: (deps: ServiceDependencies) => {
+        const taskQueue = deps.resolve(TOKENS.TaskQueue);
+        return new deps.SequentialQueueProcessor(taskQueue);
+      },
+    },
+    {
       token: TOKENS.BackgroundTaskRunner,
       importFn: () =>
         import(
@@ -113,7 +123,13 @@ function createCloudflareServiceConfig(
         ),
       class: "WorkersBackgroundRunner",
       factory: (deps: ServiceDependencies) => {
-        return new deps.WorkersBackgroundRunner({ env, ctx });
+        const taskQueue = deps.resolve(TOKENS.TaskQueue);
+        const queueProcessor = deps.resolve(TOKENS.QueueProcessor);
+        return new deps.WorkersBackgroundRunner(
+          { env, ctx },
+          taskQueue,
+          queueProcessor
+        );
       },
     },
   ];

@@ -1,13 +1,16 @@
 import "reflect-metadata";
 import { injectable, inject } from "tsyringe";
-import { LinkDomainService } from "../domain/link-service.js";
+import {
+  LinkDomainService,
+  LinkProcessingResult,
+} from "../domain/link-service.js";
 import { LinkRepository } from "../domain/link-repository.js";
+import { Link } from "../domain/link.js";
 import {
   ContentScraper,
   AISummarizer,
   Notifier,
   BackgroundTaskRunner,
-  LinkData,
   TOKENS,
 } from "../../shared/interfaces/index.js";
 
@@ -35,6 +38,25 @@ export class LinkManagementService {
   }
 
   /**
+   * 완료된 링크를 알림으로 전송
+   * @param link 전송할 링크
+   * @param context 로깅용 컨텍스트 (선택사항)
+   */
+  private async sendNotificationIfCompleted(
+    link: Link,
+    context?: string
+  ): Promise<void> {
+    if (link.isCompleted()) {
+      try {
+        await this.notifier.send(link.toLinkData());
+      } catch (error) {
+        const contextMsg = context ? ` (${context})` : "";
+        console.error(`알림 전송 실패${contextMsg} (${link.id}):`, error);
+      }
+    }
+  }
+
+  /**
    * 링크 추가 및 백그라운드 처리
    */
   async addLink(url: string, tags: string[] = []) {
@@ -50,25 +72,7 @@ export class LinkManagementService {
           );
 
           // 알림으로 전송
-          if (processedLink.isCompleted()) {
-            await this.notifier.send({
-              id: processedLink.id,
-              url: processedLink.url,
-              title: processedLink.title || undefined,
-              description: processedLink.description || undefined,
-              summary: processedLink.summary || undefined,
-              tags: [...processedLink.tags],
-              createdAt: processedLink.createdAt,
-              processedAt: processedLink.processedAt || undefined,
-              status:
-                processedLink.status === "completed"
-                  ? ("processed" as const)
-                  : (processedLink.status as
-                      | "pending"
-                      | "processed"
-                      | "failed"),
-            });
-          }
+          await this.sendNotificationIfCompleted(processedLink);
         } catch (error) {
           console.error(`링크 처리 실패 (${newLink.id}):`, error);
         }
@@ -96,39 +100,18 @@ export class LinkManagementService {
 
       // 성공적으로 처리된 링크들을 알림으로 전송
       const successfulLinks = results
-        .filter((result: any) => result.success)
-        .map((result: any) => result.link);
+        .filter((result: LinkProcessingResult) => result.success)
+        .map((result: LinkProcessingResult) => result.link);
 
       for (const link of successfulLinks) {
-        if (link.isCompleted()) {
-          try {
-            // Link 엔티티를 LinkData 형태로 변환하여 전달
-            const linkData = {
-              id: link.id,
-              url: link.url,
-              title: link.title || undefined,
-              description: link.description || undefined,
-              summary: link.summary || undefined,
-              tags: [...link.tags],
-              createdAt: link.createdAt,
-              processedAt: link.processedAt || undefined,
-              status:
-                link.status === "completed"
-                  ? ("processed" as const)
-                  : (link.status as "pending" | "processed" | "failed"),
-            };
-            await this.notifier.send(linkData);
-          } catch (error) {
-            console.error(`알림 전송 실패 (${link.id}):`, error);
-          }
-        }
+        await this.sendNotificationIfCompleted(link, "processAllLinks");
       }
 
       return {
         success: true,
         processed: results.length,
         successful: successfulLinks.length,
-        failed: results.filter((r: any) => !r.success).length,
+        failed: results.filter((r: LinkProcessingResult) => !r.success).length,
         results,
       };
     } catch (error: any) {
@@ -148,7 +131,7 @@ export class LinkManagementService {
 
       return {
         success: true,
-        links: links.map((link: any) => link.toObject()),
+        links: links.map((link: Link) => link.toObject()),
       };
     } catch (error: any) {
       return {
@@ -236,22 +219,7 @@ export class LinkManagementService {
       const processedLink = await this.linkDomainService.processLink(linkId);
 
       // Discord로 전송
-      if (processedLink.isCompleted()) {
-        await this.notifier.send({
-          id: processedLink.id,
-          url: processedLink.url,
-          title: processedLink.title || undefined,
-          description: processedLink.description || undefined,
-          summary: processedLink.summary || undefined,
-          tags: [...processedLink.tags],
-          createdAt: processedLink.createdAt,
-          processedAt: processedLink.processedAt || undefined,
-          status:
-            processedLink.status === "completed"
-              ? ("processed" as const)
-              : (processedLink.status as "pending" | "processed" | "failed"),
-        });
-      }
+      await this.sendNotificationIfCompleted(processedLink, "reprocessLink");
 
       return {
         success: true,

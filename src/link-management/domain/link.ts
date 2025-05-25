@@ -1,7 +1,4 @@
-/**
- * 링크 상태 타입
- */
-export type LinkStatus = "pending" | "processing" | "completed" | "failed";
+import type { LinkData, LinkStatus } from "../../shared/interfaces/index.js";
 
 /**
  * 링크 생성자 매개변수 인터페이스
@@ -209,5 +206,23 @@ export class Link {
       createdAt: new Date(obj.createdAt),
       processedAt: obj.processedAt ? new Date(obj.processedAt) : null,
     });
+  }
+
+  /**
+   * LinkData 인터페이스로 변환 (알림 전송용)
+   * Link 엔티티의 상태를 LinkData 형태로 변환합니다.
+   */
+  toLinkData(): LinkData {
+    return {
+      id: this.id,
+      url: this.url,
+      title: this.title || undefined,
+      description: this.description || undefined,
+      summary: this.summary || undefined,
+      tags: [...this.tags],
+      createdAt: this.createdAt,
+      processedAt: this.processedAt || undefined,
+      status: this.status,
+    };
   }
 }

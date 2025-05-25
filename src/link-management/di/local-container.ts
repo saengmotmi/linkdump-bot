@@ -90,12 +90,32 @@ function createLocalServiceConfig(
       },
     },
     {
+      token: TOKENS.TaskQueue,
+      importFn: () => import("../../shared/queue/memory-task-queue.js"),
+      class: "MemoryTaskQueue",
+      factory: (deps: ServiceDependencies) => {
+        return new deps.MemoryTaskQueue();
+      },
+    },
+    {
+      token: TOKENS.QueueProcessor,
+      importFn: () =>
+        import("../../shared/queue/sequential-queue-processor.js"),
+      class: "SequentialQueueProcessor",
+      factory: (deps: ServiceDependencies) => {
+        const taskQueue = deps.resolve(TOKENS.TaskQueue);
+        return new deps.SequentialQueueProcessor(taskQueue);
+      },
+    },
+    {
       token: TOKENS.BackgroundTaskRunner,
       importFn: () =>
         import("../infrastructure/background-task/local-background-runner.js"),
       class: "LocalBackgroundRunner",
       factory: (deps: ServiceDependencies) => {
-        return new deps.LocalBackgroundRunner();
+        const taskQueue = deps.resolve(TOKENS.TaskQueue);
+        const queueProcessor = deps.resolve(TOKENS.QueueProcessor);
+        return new deps.LocalBackgroundRunner(taskQueue, queueProcessor);
       },
     },
   ];

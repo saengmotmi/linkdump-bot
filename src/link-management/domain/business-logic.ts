@@ -1,25 +1,13 @@
 // 핵심 비즈니스 로직 - 테스트 가능하도록 분리
 
+import type { LinkData } from "../../shared/interfaces/index.js";
+
 /**
  * URL 유효성 검증 결과 인터페이스
  */
 export interface UrlValidationResult {
   valid: boolean;
   error?: string;
-}
-
-/**
- * 링크 데이터 인터페이스
- */
-export interface LinkData {
-  id: string;
-  url: string;
-  tags: string[];
-  addedAt: string;
-  processed: boolean;
-  ogData?: OGData;
-  summary?: string;
-  processedAt?: string;
 }
 
 /**
@@ -54,13 +42,6 @@ export interface NotificationMessage {
 }
 
 /**
- * 링크 컬렉션 인터페이스
- */
-export interface LinksData {
-  links: LinkData[];
-}
-
-/**
  * URL 유효성 검증
  */
 export function validateUrl(url: string): UrlValidationResult {
@@ -77,7 +58,8 @@ export function validateUrl(url: string): UrlValidationResult {
 }
 
 /**
- * 링크 데이터 생성
+ * 링크 데이터 생성 (구식 호환성을 위해 유지, 새 코드에서는 Link 엔티티 사용 권장)
+ * @deprecated Link 엔티티 클래스 사용을 권장합니다
  */
 export function createLinkData(url: string, tags: string[] = []): LinkData {
   const validation = validateUrl(url);
@@ -88,9 +70,13 @@ export function createLinkData(url: string, tags: string[] = []): LinkData {
   return {
     id: Date.now().toString(),
     url: url,
+    title: undefined,
+    description: undefined,
+    summary: undefined,
     tags: Array.isArray(tags) ? tags : [],
-    addedAt: new Date().toISOString(),
-    processed: false,
+    createdAt: new Date(),
+    processedAt: undefined,
+    status: "pending",
   };
 }
 
@@ -210,16 +196,18 @@ export function createNotificationEmbed(
   linkData: LinkData
 ): NotificationMessage {
   const embed: NotificationEmbed = {
-    title: linkData.ogData?.title || "New Link",
-    description: linkData.summary || "",
+    title: linkData.title || "New Link",
+    description: linkData.summary || linkData.description || "",
     url: linkData.url,
     color: 0x0099ff,
     timestamp: new Date().toISOString(),
   };
 
-  if (linkData.ogData?.image) {
-    embed.thumbnail = { url: linkData.ogData.image };
-  }
+  // 이미지는 별도 처리가 필요한 경우 추가 파라미터로 받거나
+  // LinkData 인터페이스에 image 필드를 추가해야 함
+  // if (linkData.image) {
+  //   embed.thumbnail = { url: linkData.image };
+  // }
 
   return { embeds: [embed] };
 }
