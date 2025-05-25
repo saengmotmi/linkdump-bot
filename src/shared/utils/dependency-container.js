@@ -21,13 +21,14 @@ import { WorkersBackgroundRunner } from "../../link-management/infrastructure/ba
 import { LocalBackgroundRunner } from "../../link-management/infrastructure/background-task/local-background-runner.js";
 
 /**
- * 의존성 컨테이너
- * 도메인 중심 아키텍처에서 의존성 주입을 관리합니다.
+ * 플러그인 기반 의존성 컨테이너
+ * 새로운 구현체를 플러그인으로 외부에서 주입할 수 있습니다.
  */
 export class DependencyContainer {
   constructor() {
     this.services = new Map();
     this.singletons = new Map();
+    this.plugins = new Map();
   }
 
   /**
@@ -38,6 +39,42 @@ export class DependencyContainer {
       factory,
       singleton: options.singleton || false,
     });
+  }
+
+  /**
+   * 플러그인 등록
+   * @param {string} type - 플러그인 타입 (storage, aiClient, aiSummarizer 등)
+   * @param {string} name - 플러그인 이름 (r2, openai, workers-ai 등)
+   * @param {Function} factory - 플러그인 팩토리 함수
+   */
+  registerPlugin(type, name, factory) {
+    if (!this.plugins.has(type)) {
+      this.plugins.set(type, new Map());
+    }
+    this.plugins.get(type).set(name, factory);
+  }
+
+  /**
+   * 플러그인 해결
+   * @param {string} type - 플러그인 타입
+   * @param {string} name - 플러그인 이름
+   * @param {...any} args - 플러그인 팩토리에 전달할 인수들
+   */
+  resolvePlugin(type, name, ...args) {
+    const typePlugins = this.plugins.get(type);
+    if (!typePlugins) {
+      throw new Error(`플러그인 타입을 찾을 수 없습니다: ${type}`);
+    }
+
+    const plugin = typePlugins.get(name);
+    if (!plugin) {
+      const availablePlugins = Array.from(typePlugins.keys()).join(", ");
+      throw new Error(
+        `플러그인을 찾을 수 없습니다: ${type}.${name}. 사용 가능한 플러그인: ${availablePlugins}`
+      );
+    }
+
+    return plugin(...args);
   }
 
   /**
@@ -250,5 +287,196 @@ export class DependencyContainer {
     );
 
     return container;
+  }
+}
+
+/**
+ * DependencyContainer 빌더
+ * 플러그인을 등록하고 환경별 설정을 구성합니다.
+ */
+export class DependencyContainerBuilder {
+  constructor() {
+    this.container = new DependencyContainer();
+    this.config = {};
+  }
+
+  /**
+   * 설정 추가
+   */
+  withConfig(config) {
+    this.config = { ...this.config, ...config };
+    return this;
+  }
+
+  /**
+   * 스토리지 플러그인 등록
+   */
+  withStoragePlugin(name, factory) {
+    this.container.registerPlugin("storage", name, factory);
+    return this;
+  }
+
+  /**
+   * AI 클라이언트 플러그인 등록
+   */
+  withAIClientPlugin(name, factory) {
+    this.container.registerPlugin("aiClient", name, factory);
+    return this;
+  }
+
+  /**
+   * AI 요약기 플러그인 등록
+   */
+  withAISummarizerPlugin(name, factory) {
+    this.container.registerPlugin("aiSummarizer", name, factory);
+    return this;
+  }
+
+  /**
+   * 런타임 플러그인 등록
+   */
+  withRuntimePlugin(name, factory) {
+    this.container.registerPlugin("runtime", name, factory);
+    return this;
+  }
+
+  /**
+   * 백그라운드 태스크 러너 플러그인 등록
+   */
+  withBackgroundTaskRunnerPlugin(name, factory) {
+    this.container.registerPlugin("backgroundTaskRunner", name, factory);
+    return this;
+  }
+
+  /**
+   * 알림기 플러그인 등록
+   */
+  withNotifierPlugin(name, factory) {
+    this.container.registerPlugin("notifier", name, factory);
+    return this;
+  }
+
+  /**
+   * 콘텐츠 스크래퍼 플러그인 등록
+   */
+  withContentScraperPlugin(name, factory) {
+    this.container.registerPlugin("contentScraper", name, factory);
+    return this;
+  }
+
+  /**
+   * 핵심 서비스들 등록
+   */
+  registerCoreServices() {
+    const { config, container } = this;
+
+    // 스토리지 서비스
+    container.register(
+      "storage",
+      () => {
+        const storageType = config.storageType || "file";
+        return container.resolvePlugin("storage", storageType, config);
+      },
+      { singleton: true }
+    );
+
+    // AI 클라이언트 서비스
+    container.register(
+      "aiClient",
+      () => {
+        const aiProvider = config.aiProvider || "openai";
+        return container.resolvePlugin("aiClient", aiProvider, config);
+      },
+      { singleton: true }
+    );
+
+    // 런타임 서비스
+    container.register(
+      "runtime",
+      () => {
+        const runtimeType = config.runtimeType || "workers";
+        return container.resolvePlugin("runtime", runtimeType, config);
+      },
+      { singleton: true }
+    );
+
+    // 링크 저장소 (도메인 서비스)
+    container.register(
+      "linkRepository",
+      (container) => {
+        // 동적 import를 통해 필요할 때만 로드
+        return import(
+          "../../link-management/infrastructure/storage-link-repository.js"
+        ).then(({ StorageLinkRepository }) => {
+          const storage = container.resolve("storage");
+          return new StorageLinkRepository(storage);
+        });
+      },
+      { singleton: true }
+    );
+
+    // 콘텐츠 스크래퍼
+    container.register("contentScraper", () => {
+      const scraperType = config.scraperType || "web";
+      return container.resolvePlugin("contentScraper", scraperType, config);
+    });
+
+    // AI 요약기
+    container.register("aiSummarizer", (container) => {
+      const aiProvider = config.aiProvider || "openai";
+      const aiClient = container.resolve("aiClient");
+      return container.resolvePlugin(
+        "aiSummarizer",
+        aiProvider,
+        aiClient,
+        config
+      );
+    });
+
+    // 알림기
+    container.register("notifier", () => {
+      const notifierType = config.notifierType || "discord";
+      return container.resolvePlugin("notifier", notifierType, config);
+    });
+
+    // 백그라운드 태스크 러너
+    container.register("backgroundTaskRunner", (container) => {
+      const taskRunnerType = config.taskRunnerType || "workers";
+      const runtime = container.resolve("runtime");
+      return container.resolvePlugin(
+        "backgroundTaskRunner",
+        taskRunnerType,
+        runtime,
+        config
+      );
+    });
+
+    // 메인 애플리케이션 서비스
+    container.register(
+      "linkManagementService",
+      async (container) => {
+        const { LinkManagementService } = await import(
+          "../../link-management/application/link-management-service.js"
+        );
+
+        return new LinkManagementService(
+          await container.resolve("linkRepository"),
+          container.resolve("contentScraper"),
+          container.resolve("aiSummarizer"),
+          container.resolve("notifier"),
+          container.resolve("backgroundTaskRunner")
+        );
+      },
+      { singleton: true }
+    );
+
+    return this;
+  }
+
+  /**
+   * 컨테이너 빌드
+   */
+  build() {
+    return this.container;
   }
 }
