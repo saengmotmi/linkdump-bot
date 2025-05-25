@@ -15,6 +15,17 @@ export interface LinkData {
 }
 
 /**
+ * Cloudflare Workers 환경 타입 정의
+ */
+export interface CloudflareEnv {
+  LINKDUMP_STORAGE: R2Bucket;
+  AI: Ai;
+  DISCORD_WEBHOOKS?: string;
+  OPENAI_API_KEY?: string;
+  CF_PAGES?: string;
+}
+
+/**
  * 저장소 인터페이스
  */
 export interface Storage {

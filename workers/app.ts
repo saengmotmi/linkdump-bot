@@ -24,21 +24,16 @@ import { container } from "tsyringe";
 // ⭐ 핵심! 의존성 주입 설정 - 이 파일이 전체 앱의 핵심 설정을 담당
 import { createCloudflareContainer } from "../src/link-management/di/cloudflare-container.js";
 import { LinkManagementService } from "../src/link-management/application/link-management-service.js";
-import { TOKENS, type Config } from "../src/shared/interfaces/index.js";
-
-// Cloudflare Workers 환경 타입 정의
-interface Env {
-  LINKDUMP_STORAGE: R2Bucket;
-  AI: Ai;
-  DISCORD_WEBHOOKS?: string;
-  OPENAI_API_KEY?: string;
-  CF_PAGES?: string;
-}
+import {
+  TOKENS,
+  type Config,
+  type CloudflareEnv,
+} from "../src/shared/interfaces/index.js";
 
 export default {
   async fetch(
     request: Request,
-    env: Env,
+    env: CloudflareEnv,
     ctx: ExecutionContext
   ): Promise<Response> {
     try {
@@ -201,7 +196,7 @@ async function handleGetLinks(
 /**
  * 설정 조회 핸들러 - 실제 컨테이너 설정을 동적으로 조회
  */
-async function handleGetConfig(env: Env): Promise<Response> {
+async function handleGetConfig(env: CloudflareEnv): Promise<Response> {
   try {
     // 실제 컨테이너에서 설정 조회
     const config = container.resolve<Config>(TOKENS.Config);
