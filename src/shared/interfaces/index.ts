@@ -76,18 +76,6 @@ export interface BackgroundTaskRunner {
 }
 
 /**
- * 링크 저장소 인터페이스
- */
-export interface LinkRepository {
-  save(link: LinkData): Promise<void>;
-  findById(id: string): Promise<LinkData | null>;
-  findAll(): Promise<LinkData[]>;
-  findUnprocessed(): Promise<LinkData[]>;
-  update(id: string, updates: Partial<LinkData>): Promise<void>;
-  delete(id: string): Promise<void>;
-}
-
-/**
  * 설정 인터페이스 - 실제 설정값만 포함
  */
 export interface Config {
@@ -112,6 +100,6 @@ export const TOKENS = {
   Notifier: Symbol.for("Notifier"),
   BackgroundTaskRunner: Symbol.for("BackgroundTaskRunner"),
 
-  // 도메인 서비스들
+  // 도메인 서비스들 (실제 인터페이스는 도메인 레이어에서 정의)
   LinkRepository: Symbol.for("LinkRepository"),
 } as const;
