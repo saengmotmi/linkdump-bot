@@ -116,7 +116,7 @@ export async function setupCloudflareContainer(env: any, ctx?: any) {
 
   // 링크 저장소 등록
   const { StorageLinkRepository } = await import(
-    "../../link-management/infrastructure/storage-link-repository.js"
+    "../../link-management/infrastructure/storage-link-repository"
   );
   const storage = container.resolve<Storage>(TOKENS.Storage);
   container.registerInstance(

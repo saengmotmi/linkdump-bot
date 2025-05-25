@@ -1,4 +1,4 @@
-import { Link, LinkStatus } from "./link.js";
+import { Link, LinkStatus } from "./link";
 
 /**
  * 링크 저장소 인터페이스

@@ -31,19 +31,6 @@ export interface LinkProcessingData {
 }
 
 /**
- * Discord 전송용 데이터 인터페이스
- */
-export interface DiscordData {
-  url: string;
-  title: string;
-  description: string;
-  image?: string;
-  summary: string;
-  tags: string[];
-  createdAt: Date;
-}
-
-/**
  * 링크 도메인 엔티티
  * 링크의 핵심 비즈니스 규칙과 불변성을 보장합니다.
  */
@@ -192,25 +179,6 @@ export class Link {
    */
   isFailed(): boolean {
     return this.status === "failed";
-  }
-
-  /**
-   * Discord 전송용 데이터 생성
-   */
-  toDiscordData(): DiscordData {
-    if (!this.isCompleted()) {
-      throw new Error("완료된 링크만 Discord로 전송할 수 있습니다.");
-    }
-
-    return {
-      url: this.url,
-      title: this.title || "No Title",
-      description: this.description || "No Description",
-      image: this.image || undefined,
-      summary: this.summary || "No Summary Available",
-      tags: [...this.tags],
-      createdAt: this.createdAt,
-    };
   }
 
   /**
