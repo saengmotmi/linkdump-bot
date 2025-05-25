@@ -1,7 +1,4 @@
-/**
- * 링크 상태 타입
- */
-export type LinkStatus = "pending" | "processing" | "completed" | "failed";
+import type { LinkData, LinkStatus } from "../../shared/interfaces/index.js";
 
 /**
  * 링크 생성자 매개변수 인터페이스
@@ -29,8 +26,6 @@ export interface LinkProcessingData {
   image?: string;
   summary: string;
 }
-
-import type { LinkData } from "../../shared/interfaces/index.js";
 
 /**
  * 링크 도메인 엔티티
