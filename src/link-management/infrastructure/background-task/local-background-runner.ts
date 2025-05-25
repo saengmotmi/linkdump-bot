@@ -3,6 +3,10 @@ import type {
   TaskQueue,
   QueueProcessor,
 } from "../../../shared/interfaces/index.js";
+import {
+  createRepeatingTask,
+  createDelayedTask,
+} from "../../../shared/utils/task-utils.js";
 
 /**
  * 로컬 개발 환경 백그라운드 태스크 러너
@@ -32,9 +36,15 @@ export class LocalBackgroundRunner implements BackgroundTaskRunner {
    * 지연된 태스크 스케줄링
    */
   scheduleDelayed(task: () => Promise<void>, delayMs: number): void {
-    setTimeout(() => {
-      this.schedule(task);
-    }, delayMs);
+    const delayedTask = createDelayedTask(task, {
+      delayMs,
+      onError: (error) => {
+        console.error("지연된 태스크 실행 실패:", error);
+      },
+    });
+
+    // 지연 태스크를 즉시 스케줄링 (내부에서 지연 처리됨)
+    this.schedule(delayedTask);
   }
 
   /**
@@ -45,24 +55,20 @@ export class LocalBackgroundRunner implements BackgroundTaskRunner {
     intervalMs: number,
     maxRuns: number = 5
   ): void {
-    let runCount = 0;
-
-    const repeatingTask = async () => {
-      if (runCount >= maxRuns) {
-        return;
-      }
-
-      try {
-        await task();
-        runCount++;
-
-        if (runCount < maxRuns) {
-          setTimeout(() => this.schedule(repeatingTask), intervalMs);
-        }
-      } catch (error) {
-        console.error("반복 태스크 실행 실패:", error);
-      }
-    };
+    const repeatingTask = createRepeatingTask(
+      task,
+      {
+        intervalMs,
+        maxRuns,
+        onError: (error, runCount) => {
+          console.error(`반복 태스크 실행 실패 (${runCount}회차):`, error);
+        },
+        onComplete: (totalRuns) => {
+          console.log(`반복 태스크 완료: 총 ${totalRuns}회 실행`);
+        },
+      },
+      (nextTask) => this.schedule(nextTask)
+    );
 
     this.schedule(repeatingTask);
   }

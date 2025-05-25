@@ -4,6 +4,10 @@ import type {
   TaskQueue,
   QueueProcessor,
 } from "../../../shared/interfaces/index.js";
+import {
+  createRepeatingTask,
+  createDelayedTask,
+} from "../../../shared/utils/task-utils.js";
 
 interface WorkersContext {
   waitUntil(promise: Promise<any>): void;
@@ -45,12 +49,15 @@ export class WorkersBackgroundRunner implements BackgroundTaskRunner {
    * 지연된 태스크 스케줄링
    */
   scheduleDelayed(task: () => Promise<void>, delayMs: number): void {
-    this.options.ctx.waitUntil(
-      (async () => {
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-        await task();
-      })()
-    );
+    const delayedTask = createDelayedTask(task, {
+      delayMs,
+      onError: (error) => {
+        console.error("지연된 태스크 실행 실패:", error);
+      },
+    });
+
+    // Workers 환경에서는 waitUntil로 직접 처리
+    this.options.ctx.waitUntil(delayedTask());
   }
 
   /**
@@ -61,24 +68,20 @@ export class WorkersBackgroundRunner implements BackgroundTaskRunner {
     intervalMs: number,
     maxRuns: number = 5
   ): void {
-    let runCount = 0;
-
-    const repeatingTask = async () => {
-      if (runCount >= maxRuns) {
-        return;
-      }
-
-      try {
-        await task();
-        runCount++;
-
-        if (runCount < maxRuns) {
-          setTimeout(() => this.schedule(repeatingTask), intervalMs);
-        }
-      } catch (error) {
-        console.error("반복 태스크 실행 실패:", error);
-      }
-    };
+    const repeatingTask = createRepeatingTask(
+      task,
+      {
+        intervalMs,
+        maxRuns,
+        onError: (error, runCount) => {
+          console.error(`반복 태스크 실행 실패 (${runCount}회차):`, error);
+        },
+        onComplete: (totalRuns) => {
+          console.log(`반복 태스크 완료: 총 ${totalRuns}회 실행`);
+        },
+      },
+      (nextTask) => this.schedule(nextTask)
+    );
 
     this.schedule(repeatingTask);
   }
