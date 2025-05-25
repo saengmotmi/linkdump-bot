@@ -120,25 +120,23 @@ export class LinkDomainService {
     // 콘텐츠 타입별 이모지 추가
     const getTypeEmoji = (type?: string): string => {
       switch (type) {
-        case "twitter":
-          return "🐦";
-        case "linkedin":
-          return "💼";
-        case "video":
-          return "🎥";
         case "social_media":
           return "📱";
-        case "general":
+        case "video":
+          return "🎥";
+        case "short_content":
           return "🔗";
-        default:
+        case "long_content":
           return "📄";
+        default:
+          return "🔗";
       }
     };
 
     const emoji = getTypeEmoji(contentType);
 
-    // Twitter/X의 경우 더 간단하게
-    if (contentType === "twitter") {
+    // 소셜미디어의 경우 더 간단하게
+    if (contentType === "social_media") {
       return `${emoji} ${cleanDescription}`;
     }
 
