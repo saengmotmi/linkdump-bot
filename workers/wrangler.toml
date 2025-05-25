@@ -1,5 +1,5 @@
-name = "linkdump-bot-workers-ai"
-main = "complete-app.js"
+name = "linkdump-bot"
+main = "app.js"
 compatibility_date = "2024-01-15"
 compatibility_flags = ["nodejs_compat"]
 
@@ -14,4 +14,8 @@ binding = "AI"
 
 # Secrets (wrangler secret put으로 설정):
 # wrangler secret put DISCORD_WEBHOOKS
-# ANTHROPIC_API_KEY는 더 이상 필요 없음!
+# 
+# 추가 가능한 설정들:
+# wrangler secret put OPENAI_API_KEY (OpenAI 사용시)
+# wrangler secret put AI_PROVIDER (workers-ai|openai)
+# wrangler secret put STORAGE_TYPE (r2|filesystem) 
